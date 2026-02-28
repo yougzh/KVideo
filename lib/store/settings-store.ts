@@ -28,8 +28,6 @@ export interface AppSettings {
   sortBy: SortOption;
   searchHistory: boolean;
   watchHistory: boolean;
-  passwordAccess: boolean;
-  accessPasswords: string[];
   // Player settings
   autoNextEpisode: boolean;
   autoSkipIntro: boolean;
@@ -44,9 +42,16 @@ export interface AppSettings {
   realtimeLatency: boolean; // Enable real-time latency ping updates
   searchDisplayMode: SearchDisplayMode; // 'normal' = individual cards, 'grouped' = group same-name videos
   episodeReverseOrder: boolean; // Persist episode list reverse state
-  fullscreenType: 'native' | 'window'; // Fullscreen mode preference
+  fullscreenType: 'auto' | 'native' | 'window'; // Fullscreen mode preference: 'auto' (native on desktop, window on mobile) | 'native' | 'window'
   proxyMode: ProxyMode; // Proxy behavior: 'retry' | 'none' | 'always'
   rememberScrollPosition: boolean; // Remember scroll position when navigating back or refreshing
+  personalizedRecommendations: boolean; // Show personalized recommendations based on watch history
+  // Danmaku settings
+  danmakuEnabled: boolean; // Show danmaku overlay on video
+  danmakuApiUrl: string; // Self-hosted danmaku API endpoint
+  danmakuOpacity: number; // 0.1 - 1.0
+  danmakuFontSize: number; // px
+  danmakuDisplayArea: number; // 0.25 | 0.5 | 0.75 | 1.0
 }
 
 import { exportSettings, importSettings, SEARCH_HISTORY_KEY, WATCH_HISTORY_KEY } from './settings-helpers';
@@ -104,8 +109,6 @@ function getDefaultAppSettings(): AppSettings {
     sortBy: 'default',
     searchHistory: true,
     watchHistory: true,
-    passwordAccess: false,
-    accessPasswords: [],
     autoNextEpisode: true,
     autoSkipIntro: false,
     skipIntroSeconds: 0,
@@ -118,9 +121,15 @@ function getDefaultAppSettings(): AppSettings {
     realtimeLatency: false,
     searchDisplayMode: 'normal',
     episodeReverseOrder: false,
-    fullscreenType: 'native',
+    fullscreenType: 'auto',
     proxyMode: 'retry',
     rememberScrollPosition: true,
+    personalizedRecommendations: true,
+    danmakuEnabled: false,
+    danmakuApiUrl: process.env.NEXT_PUBLIC_DANMAKU_API_URL || '',
+    danmakuOpacity: 0.7,
+    danmakuFontSize: 20,
+    danmakuDisplayArea: 0.5,
   };
 }
 
@@ -182,8 +191,6 @@ export const settingsStore = {
         sortBy: parsed.sortBy || 'default',
         searchHistory: parsed.searchHistory !== undefined ? parsed.searchHistory : true,
         watchHistory: parsed.watchHistory !== undefined ? parsed.watchHistory : true,
-        passwordAccess: parsed.passwordAccess !== undefined ? parsed.passwordAccess : false,
-        accessPasswords: Array.isArray(parsed.accessPasswords) ? parsed.accessPasswords : [],
         autoNextEpisode: parsed.autoNextEpisode !== undefined ? parsed.autoNextEpisode : true,
         autoSkipIntro: parsed.autoSkipIntro !== undefined ? parsed.autoSkipIntro : false,
         skipIntroSeconds: typeof parsed.skipIntroSeconds === 'number' ? parsed.skipIntroSeconds : 0,
@@ -196,9 +203,15 @@ export const settingsStore = {
         realtimeLatency: parsed.realtimeLatency !== undefined ? parsed.realtimeLatency : false,
         searchDisplayMode: parsed.searchDisplayMode === 'grouped' ? 'grouped' : 'normal',
         episodeReverseOrder: parsed.episodeReverseOrder !== undefined ? parsed.episodeReverseOrder : false,
-        fullscreenType: parsed.fullscreenType === 'window' ? 'window' : 'native',
+        fullscreenType: (parsed.fullscreenType === 'window' || parsed.fullscreenType === 'native' || parsed.fullscreenType === 'auto') ? parsed.fullscreenType : 'auto',
         proxyMode: (parsed.proxyMode === 'retry' || parsed.proxyMode === 'none' || parsed.proxyMode === 'always') ? parsed.proxyMode : 'retry',
         rememberScrollPosition: parsed.rememberScrollPosition !== undefined ? parsed.rememberScrollPosition : true,
+        personalizedRecommendations: parsed.personalizedRecommendations !== undefined ? parsed.personalizedRecommendations : true,
+        danmakuEnabled: parsed.danmakuEnabled !== undefined ? parsed.danmakuEnabled : false,
+        danmakuApiUrl: typeof parsed.danmakuApiUrl === 'string' ? (parsed.danmakuApiUrl || process.env.NEXT_PUBLIC_DANMAKU_API_URL || '') : (process.env.NEXT_PUBLIC_DANMAKU_API_URL || ''),
+        danmakuOpacity: typeof parsed.danmakuOpacity === 'number' ? parsed.danmakuOpacity : 0.7,
+        danmakuFontSize: typeof parsed.danmakuFontSize === 'number' ? parsed.danmakuFontSize : 20,
+        danmakuDisplayArea: typeof parsed.danmakuDisplayArea === 'number' ? parsed.danmakuDisplayArea : 0.5,
       };
     } catch {
       // Even if localStorage fails, we should return defaults + ENV subscriptions

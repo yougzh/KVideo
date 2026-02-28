@@ -8,7 +8,11 @@ import { useAutoSkip } from './hooks/useAutoSkip';
 import { useStallDetection } from './hooks/useStallDetection';
 import { DesktopControlsWrapper } from './desktop/DesktopControlsWrapper';
 import { DesktopOverlayWrapper } from './desktop/DesktopOverlayWrapper';
+import { DanmakuCanvas } from './DanmakuCanvas';
 import { usePlayerSettings } from './hooks/usePlayerSettings';
+import { useDanmaku } from './hooks/useDanmaku';
+import { useIsIOS, useIsMobile } from '@/lib/hooks/mobile/useDeviceDetection';
+import { useDoubleTap } from '@/lib/hooks/mobile/useDoubleTap';
 import './web-fullscreen.css';
 
 interface DesktopVideoPlayerProps {
@@ -23,6 +27,9 @@ interface DesktopVideoPlayerProps {
   currentEpisodeIndex?: number;
   onNextEpisode?: () => void;
   isReversed?: boolean;
+  // Danmaku props
+  videoTitle?: string;
+  episodeName?: string;
 }
 
 export function DesktopVideoPlayer({
@@ -36,9 +43,51 @@ export function DesktopVideoPlayer({
   currentEpisodeIndex = 0,
   onNextEpisode,
   isReversed = false,
+  videoTitle = '',
+  episodeName = '',
 }: DesktopVideoPlayerProps) {
   const { refs, data, actions } = useDesktopPlayerState();
-  const { fullscreenType } = usePlayerSettings();
+  const { fullscreenType: settingsFullscreenType } = usePlayerSettings();
+  const isIOS = useIsIOS();
+  const isMobile = useIsMobile();
+
+  // Danmaku
+  const { danmakuEnabled, setDanmakuEnabled, comments: danmakuComments } = useDanmaku({
+    videoTitle,
+    episodeName,
+    episodeIndex: currentEpisodeIndex,
+  });
+
+  // State to track if device is in landscape mode
+  const [isLandscape, setIsLandscape] = React.useState(true);
+
+  React.useEffect(() => {
+    const checkOrientation = () => {
+      // Check if width > height
+      if (typeof window !== 'undefined') {
+        setIsLandscape(window.innerWidth > window.innerHeight);
+      }
+    };
+
+    checkOrientation();
+    window.addEventListener('resize', checkOrientation);
+    window.addEventListener('orientationchange', checkOrientation);
+    return () => {
+      window.removeEventListener('resize', checkOrientation);
+      window.removeEventListener('orientationchange', checkOrientation);
+    };
+  }, []);
+
+  // Use user preference for fullscreen type, resolving 'auto' to device default
+  // Auto Rules:
+  // - Mobile: Window Fullscreen (Better for Danmaku/Controls)
+  // - Desktop: Native Fullscreen (Better for PiP/Performance)
+  const fullscreenType = settingsFullscreenType === 'auto'
+    ? (isIOS ? 'window' : isMobile ? 'window' : 'native') // Treat all mobile as window for consistency if auto
+    : settingsFullscreenType;
+
+  // Check if we need to force landscape (iOS + Fullscreen + Portrait)
+  const shouldForceLandscape = data.isFullscreen && fullscreenType === 'window' && isIOS && !isLandscape;
 
   // Initialize HLS Player
   useHlsPlayer({
@@ -79,7 +128,8 @@ export function DesktopVideoPlayer({
     refs,
     data,
     actions,
-    fullscreenType
+    fullscreenType,
+    isForceLandscape: shouldForceLandscape
   });
 
   // Auto-skip intro/outro and auto-next episode
@@ -106,6 +156,7 @@ export function DesktopVideoPlayer({
 
   const {
     handleMouseMove,
+    handleTouchToggleControls,
     togglePlay,
     handlePlay,
     handlePause,
@@ -114,11 +165,33 @@ export function DesktopVideoPlayer({
     handleVideoError,
   } = logic;
 
+  // Mobile double-tap gesture for skip forward/backward
+  const { handleTap } = useDoubleTap({
+    onSingleTap: handleTouchToggleControls,
+    onDoubleTapLeft: () => {
+      logic.skipBackward();
+      handleMouseMove(); // Reset 3s auto-hide timer
+    },
+    onDoubleTapRight: () => {
+      logic.skipForward();
+      handleMouseMove(); // Reset 3s auto-hide timer
+    },
+    onSkipContinueLeft: () => {
+      logic.skipBackward();
+      handleMouseMove();
+    },
+    onSkipContinueRight: () => {
+      logic.skipForward();
+      handleMouseMove();
+    },
+    isSkipModeActive: data.showSkipForwardIndicator || data.showSkipBackwardIndicator,
+  });
+
   return (
     <div
       ref={containerRef}
       className={`kvideo-container relative aspect-video bg-black rounded-[var(--radius-2xl)] group ${data.isFullscreen && fullscreenType === 'window' ? 'is-web-fullscreen' : ''
-        }`}
+        } ${shouldForceLandscape ? 'force-landscape' : ''}`}
       onMouseMove={handleMouseMove}
       onMouseLeave={() => isPlaying && setShowControls(false)}
     >
@@ -132,6 +205,8 @@ export function DesktopVideoPlayer({
             className="w-full h-full object-contain"
             poster={poster}
             x-webkit-airplay="allow"
+            playsInline={true} // Crucial for iOS custom fullscreen to work without native player taking over
+            controls={false} // Explicitly disable native controls
             onPlay={handlePlay}
             onPause={handlePause}
             onTimeUpdate={handleTimeUpdateEvent}
@@ -139,13 +214,28 @@ export function DesktopVideoPlayer({
             onError={handleVideoError}
             onWaiting={() => setIsLoading(true)}
             onCanPlay={() => setIsLoading(false)}
-            onClick={togglePlay}
+            onClick={!isMobile ? (e) => {
+              togglePlay();
+            } : undefined}
+            onTouchStart={isMobile ? handleTap : undefined}
+            {...({ 'webkit-playsinline': 'true' } as any)} // Legacy iOS support
           />
+
+          {/* Danmaku Canvas */}
+          {danmakuEnabled && danmakuComments.length > 0 && (
+            <DanmakuCanvas
+              comments={danmakuComments}
+              currentTime={currentTime}
+              isPlaying={isPlaying}
+              duration={duration}
+            />
+          )}
 
           <DesktopOverlayWrapper
             data={data}
             actions={actions}
             showControls={data.showControls}
+            isRotated={shouldForceLandscape}
             onTogglePlay={togglePlay}
             onSkipForward={logic.skipForward}
             onSkipBackward={logic.skipBackward}

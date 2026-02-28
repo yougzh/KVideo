@@ -9,6 +9,7 @@ interface StreamHandlerParams {
     onProgress: (completedSources: number, totalVideosFound: number) => void;
     onComplete: () => void;
     onError: (message: string) => void;
+    onPageInfo?: (maxPageCount: number) => void;
     currentQuery: string;
 }
 
@@ -19,6 +20,7 @@ export async function processSearchStream({
     onProgress,
     onComplete,
     onError,
+    onPageInfo,
     currentQuery,
 }: StreamHandlerParams) {
     const decoder = new TextDecoder();
@@ -69,6 +71,9 @@ export async function processSearchStream({
                                 relevanceScore: calculateRelevanceScore(video, currentQuery),
                             }));
                         onVideos(newVideos, data.source);
+                        if (data.pagecount && onPageInfo) {
+                            onPageInfo(data.pagecount);
+                        }
                         resetTimeout();
                     } else if (data.type === 'progress') {
                         onProgress(data.completedSources, data.totalVideosFound);
@@ -76,6 +81,9 @@ export async function processSearchStream({
                     } else if (data.type === 'complete') {
                         if (timeoutId) clearTimeout(timeoutId);
                         isCompleted = true;
+                        if (data.maxPageCount && onPageInfo) {
+                            onPageInfo(data.maxPageCount);
+                        }
                         onComplete();
                     } else if (data.type === 'error') {
                         onError(data.message);

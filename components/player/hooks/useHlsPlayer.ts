@@ -201,6 +201,20 @@ export function useHlsPlayer({
             // If it's in sub-playlists, it might fail unless we parse and blob those too (complex).
 
             if (isAdFilterEnabled) {
+                const fetchWithFallback = async (url: string): Promise<string> => {
+                    try {
+                        const res = await fetch(url);
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        return await res.text();
+                    } catch (e) {
+                        console.warn(`[HLS Native] Fetch failed for ${url}, trying proxy...`, e);
+                        const proxiedUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+                        const res = await fetch(proxiedUrl);
+                        if (!res.ok) throw new Error(`Proxy fetch failed: HTTP ${res.status}`);
+                        return await res.text();
+                    }
+                };
+
                 const processMasterPlaylist = async (masterSrc: string) => {
                     // Move blob tracking outside try to ensure cleanup on error
                     const createdBlobs: string[] = [];
@@ -214,8 +228,7 @@ export function useHlsPlayer({
                     }
 
                     try {
-                        const response = await fetch(absoluteMasterSrc);
-                        const masterContent = await response.text();
+                        const masterContent = await fetchWithFallback(absoluteMasterSrc);
 
                         // If it's a simple playlist (no variants), just filter and play
                         if (!masterContent.includes('#EXT-X-STREAM-INF')) {
@@ -246,8 +259,7 @@ export function useHlsPlayer({
                                     if (isRelative || uri.startsWith('http')) {
                                         try {
                                             const absoluteUrl = isRelative ? new URL(uri, absoluteMasterSrc).toString() : uri;
-                                            const subRes = await fetch(absoluteUrl);
-                                            const subContent = await subRes.text();
+                                            const subContent = await fetchWithFallback(absoluteUrl);
                                             const filteredSub = filterM3u8Ad(subContent, absoluteUrl, adFilterMode, adKeywords);
                                             const subBlob = new Blob([filteredSub], { type: 'application/vnd.apple.mpegurl' });
                                             const subBlobUrl = URL.createObjectURL(subBlob);
@@ -270,8 +282,7 @@ export function useHlsPlayer({
                                 if (isRelative || trimmedLine.startsWith('http')) {
                                     try {
                                         const absoluteUrl = isRelative ? new URL(trimmedLine, absoluteMasterSrc).toString() : trimmedLine;
-                                        const subRes = await fetch(absoluteUrl);
-                                        const subContent = await subRes.text();
+                                        const subContent = await fetchWithFallback(absoluteUrl);
                                         const filteredSub = filterM3u8Ad(subContent, absoluteUrl, adFilterMode, adKeywords);
                                         const subBlob = new Blob([filteredSub], { type: 'application/vnd.apple.mpegurl' });
                                         const subBlobUrl = URL.createObjectURL(subBlob);
@@ -312,6 +323,40 @@ export function useHlsPlayer({
                 processMasterPlaylist(src).then((result) => {
                     video.src = result.masterBlobUrl;
                     extraBlobs = result.allBlobs;
+
+                    // Some WebView-based browsers (Alook, Arthur, etc.) cannot play from blob: URLs.
+                    // Detect playback failure and fall back to the original source.
+                    let blobPlaybackFailed = false;
+
+                    const onBlobError = () => {
+                        if (blobPlaybackFailed) return;
+                        blobPlaybackFailed = true;
+                        console.warn('[HLS Native] Blob URL playback failed, falling back to original source.');
+                        video.removeEventListener('error', onBlobError);
+                        onError?.('当前浏览器不支持广告过滤，已回退到原始视频流');
+                        // Revoke blob URLs immediately
+                        extraBlobs.forEach(url => URL.revokeObjectURL(url));
+                        extraBlobs = [];
+                        video.src = src;
+                    };
+
+                    video.addEventListener('error', onBlobError);
+
+                    // Also set a timeout: if video hasn't started loading within 8s, fall back
+                    const fallbackTimer = setTimeout(() => {
+                        if (video.readyState === 0 && !blobPlaybackFailed) {
+                            console.warn('[HLS Native] Blob URL playback timed out, falling back to original source.');
+                            onBlobError();
+                        }
+                    }, 8000);
+
+                    // Clear the timeout once video starts loading
+                    const onLoadedData = () => {
+                        clearTimeout(fallbackTimer);
+                        video.removeEventListener('error', onBlobError);
+                        video.removeEventListener('loadeddata', onLoadedData);
+                    };
+                    video.addEventListener('loadeddata', onLoadedData);
                 }).catch((e) => {
                     console.warn('[HLS Native] Ad filtering failed, falling back to original source.', e);
                     onError?.('广告过滤失败，已回退到原始视频流');

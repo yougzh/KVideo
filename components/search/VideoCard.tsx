@@ -48,6 +48,7 @@ export const VideoCard = memo<VideoCardProps>(({
                 role="listitem"
                 aria-label={`${video.vod_name}${video.vod_remarks ? ` - ${video.vod_remarks}` : ''}`}
                 prefetch={false}
+                data-focusable
                 className="group cursor-pointer hover:translate-y-[-2px] transition-transform duration-200 ease-out block h-full"
             >
                 <Card
@@ -81,18 +82,26 @@ export const VideoCard = memo<VideoCardProps>(({
                             </div>
                         )}
 
-                        {/* Fallback Icon */}
-                        <div className="absolute inset-0 flex items-center justify-center -z-10">
-                            <Icons.Film size={64} className="text-[var(--text-color-secondary)] opacity-20" />
+                        {/* Fallback Icon - visible when image fails */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center -z-10 gap-2">
+                            <Icons.Film size={48} className="text-[var(--text-color-secondary)] opacity-40" />
+                            <span className="text-xs text-[var(--text-color-secondary)] opacity-60 px-2 text-center line-clamp-2">{video.vod_name}</span>
                         </div>
 
                         {/* Badge Container */}
                         <div className="absolute top-2 left-2 right-2 z-10 flex items-center justify-between gap-1">
-                            {video.sourceName && (
-                                <Badge variant="primary" className="bg-[var(--accent-color)] flex-shrink-0 max-w-[50%] truncate">
-                                    {video.sourceName}
-                                </Badge>
-                            )}
+                            <div className="flex items-center gap-1 min-w-0">
+                                {video.sourceName && (
+                                    <Badge variant="primary" className="bg-[var(--accent-color)] flex-shrink-0 max-w-[50%] truncate">
+                                        {video.sourceName}
+                                    </Badge>
+                                )}
+                                {video.type_name && (
+                                    <Badge variant="secondary" className="flex-shrink-0 max-w-[40%] truncate text-[10px]">
+                                        {video.type_name}
+                                    </Badge>
+                                )}
+                            </div>
 
                             {displayLatency !== undefined && (
                                 <LatencyBadge latency={displayLatency} className="flex-shrink-0" />
@@ -166,6 +175,11 @@ export const VideoCard = memo<VideoCardProps>(({
                                     {video.vod_remarks && video.vod_remarks !== displayQuality && (
                                         <p className="text-xs text-[var(--text-color-secondary)] mt-1 line-clamp-1">
                                             {video.vod_remarks}
+                                        </p>
+                                    )}
+                                    {video.vod_lang && (
+                                        <p className="text-xs text-[var(--text-color-secondary)] mt-1">
+                                            {video.vod_lang}
                                         </p>
                                     )}
                                 </>

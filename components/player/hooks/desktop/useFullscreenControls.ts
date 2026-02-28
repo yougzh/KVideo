@@ -25,12 +25,17 @@ export function useFullscreenControls({
 }: UseFullscreenControlsProps) {
     useEffect(() => {
         if (typeof document !== 'undefined') {
-            setIsPiPSupported('pictureInPictureEnabled' in document);
+            const hasNativePiP = 'pictureInPictureEnabled' in document;
+            const hasWebkitPiP = videoRef.current && (
+                'webkitSupportsPresentationMode' in (videoRef.current as any) ||
+                'webkitPresentationMode' in (videoRef.current as any)
+            );
+            setIsPiPSupported(hasNativePiP || !!hasWebkitPiP);
         }
         if (typeof window !== 'undefined') {
             setIsAirPlaySupported('WebKitPlaybackTargetAvailabilityEvent' in window);
         }
-    }, [setIsPiPSupported, setIsAirPlaySupported]);
+    }, [setIsPiPSupported, setIsAirPlaySupported, videoRef]);
 
     const toggleFullscreen = useCallback(async () => {
         if (!containerRef.current) return;
@@ -155,11 +160,16 @@ export function useFullscreenControls({
 
     const togglePictureInPicture = useCallback(async () => {
         if (!videoRef.current || !isPiPSupported) return;
+        const video = videoRef.current as any;
         try {
             if (document.pictureInPictureElement) {
                 await document.exitPictureInPicture();
-            } else {
-                await videoRef.current.requestPictureInPicture();
+            } else if (video.webkitPresentationMode === 'picture-in-picture') {
+                video.webkitSetPresentationMode('inline');
+            } else if (video.requestPictureInPicture) {
+                await video.requestPictureInPicture();
+            } else if (video.webkitSupportsPresentationMode && video.webkitSupportsPresentationMode('picture-in-picture')) {
+                video.webkitSetPresentationMode('picture-in-picture');
             }
         } catch (error) {
             console.error('Failed to toggle Picture-in-Picture:', error);

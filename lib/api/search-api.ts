@@ -11,7 +11,7 @@ async function searchVideosBySource(
     query: string,
     source: VideoSource,
     page: number = 1
-): Promise<{ results: VideoItem[]; source: string; responseTime: number }> {
+): Promise<{ results: VideoItem[]; source: string; responseTime: number; pagecount: number }> {
     const startTime = Date.now();
 
     const url = new URL(`${source.baseUrl}${source.searchPath}`);
@@ -51,6 +51,7 @@ async function searchVideosBySource(
             results,
             source: source.id,
             responseTime: Date.now() - startTime,
+            pagecount: data.pagecount ?? 1,
         };
     } catch (error) {
         console.error(`Search failed for source ${source.name}:`, error);
@@ -71,7 +72,7 @@ export async function searchVideos(
     query: string,
     sources: VideoSource[],
     page: number = 1
-): Promise<Array<{ results: VideoItem[]; source: string; responseTime?: number; error?: string }>> {
+): Promise<Array<{ results: VideoItem[]; source: string; responseTime?: number; pagecount?: number; error?: string }>> {
     const searchPromises = sources.map(async source => {
         try {
             return await searchVideosBySource(query, source, page);

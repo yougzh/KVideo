@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Card } from '@/components/ui/Card';
 import { useHistory } from '@/lib/store/history-store';
 import { settingsStore } from '@/lib/store/settings-store';
+import { premiumModeSettingsStore } from '@/lib/store/premium-mode-settings';
 import { CustomVideoPlayer } from './CustomVideoPlayer';
 import { VideoPlayerError } from './VideoPlayerError';
 import { VideoPlayerEmpty } from './VideoPlayerEmpty';
@@ -19,6 +20,11 @@ interface VideoPlayerProps {
   onNextEpisode?: () => void;
   isReversed?: boolean;
   isPremium?: boolean;
+  // Danmaku props
+  videoTitle?: string;
+  episodeName?: string;
+  // Expose current time to parent
+  externalTimeRef?: React.MutableRefObject<number>;
 }
 
 export function VideoPlayer({
@@ -29,7 +35,10 @@ export function VideoPlayer({
   totalEpisodes,
   onNextEpisode,
   isReversed = false,
-  isPremium = false
+  isPremium = false,
+  videoTitle,
+  episodeName,
+  externalTimeRef,
 }: VideoPlayerProps) {
   const [videoError, setVideoError] = useState<string>('');
   const [useProxy, setUseProxy] = useState(false);
@@ -47,14 +56,15 @@ export function VideoPlayer({
   const [proxyMode, setProxyMode] = useState<'retry' | 'none' | 'always'>('retry');
 
   useEffect(() => {
-    // Initial value
-    const settings = settingsStore.getSettings();
+    // Initial value - use mode-specific store
+    const store = isPremium ? premiumModeSettingsStore : settingsStore;
+    const settings = store.getSettings();
     setShowModeIndicator(settings.showModeIndicator);
     setProxyMode(settings.proxyMode);
 
     // Subscribe to changes
-    const unsubscribe = settingsStore.subscribe(() => {
-      const newSettings = settingsStore.getSettings();
+    const unsubscribe = store.subscribe(() => {
+      const newSettings = store.getSettings();
       setShowModeIndicator(newSettings.showModeIndicator);
       setProxyMode(newSettings.proxyMode);
     });
@@ -85,17 +95,19 @@ export function VideoPlayer({
 
   // Get saved progress for this video
   const getSavedProgress = () => {
+    // Check for explicit time parameter (from source switch)
+    const timeParam = searchParams.get('t');
+    if (timeParam) {
+      const t = parseFloat(timeParam);
+      if (t > 0 && isFinite(t)) return t;
+    }
+
     if (!videoId) return 0;
 
-    // Directly check HistoryStore for progress
-    // We prioritize a strict match (including source), but fall back to any match for this video/episode
-    // This fixes issues where the source parameter might be missing or different
+    // Match by normalized title + episode index (source-agnostic)
+    const normalizedTitle = title.toLowerCase().trim();
     const historyItem = viewingHistory.find(item =>
-      item.videoId.toString() === videoId?.toString() &&
-      item.episodeIndex === currentEpisode &&
-      (source ? item.source === source : true)
-    ) || viewingHistory.find(item =>
-      item.videoId.toString() === videoId?.toString() &&
+      item.title.toLowerCase().trim() === normalizedTitle &&
       item.episodeIndex === currentEpisode
     );
 
@@ -123,6 +135,8 @@ export function VideoPlayer({
     // Always track current time for beforeunload
     currentTimeRef.current = currentTime;
     durationRef.current = duration;
+    // Expose to parent for source switching
+    if (externalTimeRef) externalTimeRef.current = currentTime;
 
     if (!videoId || !playUrl || duration === 0) return;
 
@@ -195,6 +209,7 @@ export function VideoPlayer({
   }
 
   return (
+    <div data-no-spatial>
     <Card hover={false} className="p-0 relative">
       {/* Mode Indicator Badge - controlled by settings */}
       {showModeIndicator && (
@@ -227,8 +242,11 @@ export function VideoPlayer({
           currentEpisodeIndex={currentEpisode}
           onNextEpisode={onNextEpisode}
           isReversed={isReversed}
+          videoTitle={videoTitle}
+          episodeName={episodeName}
         />
       )}
     </Card>
+    </div>
   );
 }

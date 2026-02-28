@@ -18,8 +18,7 @@ export function WatchHistorySidebar({ isPremium = false }: { isPremium?: boolean
   const [isOpen, setIsOpen] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     isOpen: boolean;
-    videoId?: string;
-    source?: string;
+    showIdentifier?: string;
     isClearAll?: boolean;
   }>({ isOpen: false });
   const { viewingHistory, removeFromHistory, clearHistory } = useHistory(isPremium);
@@ -58,8 +57,8 @@ export function WatchHistorySidebar({ isPremium = false }: { isPremium?: boolean
   }, [isOpen]);
 
   // Handle delete confirmation
-  const handleDeleteItem = (videoId: string | number, source: string) => {
-    setDeleteConfirm({ isOpen: true, videoId: String(videoId), source });
+  const handleDeleteItem = (showIdentifier: string) => {
+    setDeleteConfirm({ isOpen: true, showIdentifier });
   };
 
   const handleClearAll = () => {
@@ -69,8 +68,8 @@ export function WatchHistorySidebar({ isPremium = false }: { isPremium?: boolean
   const confirmDelete = () => {
     if (deleteConfirm.isClearAll) {
       clearHistory();
-    } else if (deleteConfirm.videoId && deleteConfirm.source) {
-      removeFromHistory(deleteConfirm.videoId, deleteConfirm.source);
+    } else if (deleteConfirm.showIdentifier) {
+      removeFromHistory(deleteConfirm.showIdentifier);
     }
     setDeleteConfirm({ isOpen: false });
   };

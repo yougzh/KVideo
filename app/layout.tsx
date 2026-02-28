@@ -3,6 +3,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { AutoSync } from '@/components/AutoSync'; // <-- 引入了自动同步组件
+import { TVProvider } from "@/lib/contexts/TVContext";
+import { TVNavigationInitializer } from "@/components/TVNavigationInitializer";
 import { Analytics } from "@vercel/analytics/react";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 import { PasswordGate } from "@/components/PasswordGate";
@@ -12,6 +15,7 @@ import { BackToTop } from "@/components/ui/BackToTop";
 import { ScrollPositionManager } from "@/components/ScrollPositionManager";
 import fs from 'fs';
 import path from 'path';
+
 
 // Server Component specifically for reading env/file (async for best practices)
 async function AdKeywordsWrapper() {
@@ -77,17 +81,36 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
+      <head>
+        {/* PWA Manifest */}
+        <link rel="manifest" href="/manifest.json" />
+        {/* Apple PWA Support */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="KVideo" />
+        <link rel="apple-touch-icon" href="/icon.png" />
+        {/* Theme Color (for browser address bar) */}
+        <meta name="theme-color" content="#000000" />
+        {/* Mobile viewport */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
         <ThemeProvider>
-          <PasswordGate hasEnvPassword={!!process.env.ACCESS_PASSWORD}>
-            <AdKeywordsWrapper />
-            {children}
-            <BackToTop />
-            <ScrollPositionManager />
-          </PasswordGate>
+          {/* 加入自动同步组件，它会在后台默默工作，我们放在 ThemeProvider 内部的最前面 */}
+          <AutoSync />
+
+          <TVProvider>
+            <TVNavigationInitializer />
+            <PasswordGate hasAuth={!!(process.env.ADMIN_PASSWORD || process.env.ACCOUNTS || process.env.ACCESS_PASSWORD)}>
+              <AdKeywordsWrapper />
+              {children}
+              <BackToTop />
+              <ScrollPositionManager />
+            </PasswordGate>
+          </TVProvider>
           <Analytics />
           <ServiceWorkerRegister />
         </ThemeProvider>

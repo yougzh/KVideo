@@ -89,6 +89,8 @@ export function useDesktopShortcuts({
                     setVolume(newVolUp);
                     if (videoRef.current) videoRef.current.volume = newVolUp;
                     setIsMuted(newVolUp === 0);
+                    localStorage.setItem('kvideo-volume', String(newVolUp));
+                    localStorage.setItem('kvideo-muted', String(newVolUp === 0));
                     showVolumeBarTemporarily();
                     break;
                 case 'arrowdown':
@@ -97,6 +99,8 @@ export function useDesktopShortcuts({
                     setVolume(newVolDown);
                     if (videoRef.current) videoRef.current.volume = newVolDown;
                     setIsMuted(newVolDown === 0);
+                    localStorage.setItem('kvideo-volume', String(newVolDown));
+                    localStorage.setItem('kvideo-muted', String(newVolDown === 0));
                     showVolumeBarTemporarily();
                     break;
             }

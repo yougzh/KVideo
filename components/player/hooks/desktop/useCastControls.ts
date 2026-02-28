@@ -38,18 +38,9 @@ export function useCastControls({
                 autoJoinPolicy: window.chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
             });
 
-            // Monitor cast state
-            castContext.addEventListener(
-                window.cast.framework.CastContextEventType.CAST_STATE_CHANGED,
-                (event: any) => {
-                    const state = event.castState;
-                    setIsCastAvailable(state !== window.cast.framework.CastState.NO_DEVICES_AVAILABLE);
-                }
-            );
-
-            // Initial state check
-            const initialState = castContext.getCastState();
-            setIsCastAvailable(initialState !== window.cast.framework.CastState.NO_DEVICES_AVAILABLE);
+            // SDK loaded — show cast button immediately.
+            // requestSession() will re-scan and show Chrome's native device picker.
+            setIsCastAvailable(true);
 
             // Monitor session state
             castContext.addEventListener(

@@ -1,13 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { settingsStore } from '@/lib/store/settings-store';
+import { getSession, setSession } from '@/lib/store/auth-store';
 import { useSubscriptionSync } from '@/lib/hooks/useSubscriptionSync';
+import { settingsStore } from '@/lib/store/settings-store';
 import { Lock } from 'lucide-react';
 
-const SESSION_UNLOCKED_KEY = 'kvideo-unlocked';
-
-export function PasswordGate({ children, hasEnvPassword: initialHasEnvPassword }: { children: React.ReactNode, hasEnvPassword: boolean }) {
+export function PasswordGate({ children, hasAuth: initialHasAuth }: { children: React.ReactNode, hasAuth: boolean }) {
     // Enable background subscription syncing globally
     useSubscriptionSync();
 
@@ -15,58 +14,43 @@ export function PasswordGate({ children, hasEnvPassword: initialHasEnvPassword }
     const [password, setPassword] = useState('');
     const [error, setError] = useState(false);
     const [isClient, setIsClient] = useState(false);
-    const [hasEnvPassword, setHasEnvPassword] = useState(initialHasEnvPassword);
-    const [persistEnabled, setPersistEnabled] = useState(true);
+    const [hasAuth, setHasAuth] = useState(initialHasAuth);
+    const [persistSession, setPersistSession] = useState(true);
     const [isValidating, setIsValidating] = useState(false);
 
     useEffect(() => {
         let mounted = true;
 
         const init = async () => {
-            const settings = settingsStore.getSettings();
+            // Check if already has a valid session
+            const session = getSession();
+            const isAuthenticated = !!session;
 
-            // Check both storage if persistence might be enabled
-            const getUnlockedState = (canPersist: boolean) => {
-                const sessionUnlocked = sessionStorage.getItem(SESSION_UNLOCKED_KEY) === 'true';
-                if (!canPersist) return sessionUnlocked;
-                const localUnlocked = localStorage.getItem(SESSION_UNLOCKED_KEY) === 'true';
-                return sessionUnlocked || localUnlocked;
-            };
+            // Initial fast check
+            const localLocked = initialHasAuth && !isAuthenticated;
+            if (mounted) {
+                setIsLocked(localLocked);
+                setIsClient(true);
+            }
 
-            // 1. Initial local check (fast)
-            // Determine if the app SHOULD be protected
-            const isProtected = (settings.passwordAccess && settings.accessPasswords.length > 0) || initialHasEnvPassword;
-
-            // Default to canPersist = true for first check if not sure
-            const isUnlocked = getUnlockedState(true);
-            const localLocked = isProtected && !isUnlocked;
-            if (mounted) setIsLocked(localLocked);
-            if (mounted) setIsClient(true);
-
-            // 2. Fetch remote config & sync
+            // Fetch remote config & sync
             try {
-                const res = await fetch('/api/config');
-                if (!res.ok) throw new Error('Failed to fetch config');
+                const res = await fetch('/api/auth');
+                if (!res.ok) throw new Error('Failed to fetch auth config');
 
                 const data = await res.json();
 
                 if (mounted) {
-                    setHasEnvPassword(data.hasEnvPassword);
-                    setPersistEnabled(data.persistPassword);
+                    setHasAuth(data.hasAuth);
+                    setPersistSession(data.persistSession);
 
-                    // CRITICAL: Sync subscriptions immediately
+                    // Sync subscriptions
                     if (data.subscriptionSources) {
-                        console.log('Syncing env subscriptions:', data.subscriptionSources);
                         settingsStore.syncEnvSubscriptions(data.subscriptionSources);
                     }
 
                     // Re-evaluate lock status with confirmed server state
-                    // Persistence only works if hasEnvPassword is true
-                    const canPersist = data.hasEnvPassword && data.persistPassword;
-                    const finalUnlocked = getUnlockedState(canPersist);
-
-                    const isProtectedNow = (settings.passwordAccess && settings.accessPasswords.length > 0) || data.hasEnvPassword;
-                    const confirmLocked = isProtectedNow && !finalUnlocked;
+                    const confirmLocked = data.hasAuth && !isAuthenticated;
                     setIsLocked(confirmLocked);
                 }
             } catch (e) {
@@ -76,73 +60,35 @@ export function PasswordGate({ children, hasEnvPassword: initialHasEnvPassword }
 
         init();
 
-        return () => {
-            mounted = false;
-        };
-    }, [initialHasEnvPassword]);
-
-    // Subscribe to settings changes (real-time updates)
-    useEffect(() => {
-        const handleSettingsUpdate = () => {
-            const settings = settingsStore.getSettings();
-            const canPersist = hasEnvPassword && persistEnabled;
-            const isUnlocked = (sessionStorage.getItem(SESSION_UNLOCKED_KEY) === 'true') ||
-                (canPersist && localStorage.getItem(SESSION_UNLOCKED_KEY) === 'true');
-
-            const isProtected = (settings.passwordAccess && settings.accessPasswords.length > 0) || hasEnvPassword;
-
-            if (!isProtected) {
-                setIsLocked(false);
-            } else if (!isUnlocked) {
-                setIsLocked(true);
-            }
-        };
-
-        const unsubscribe = settingsStore.subscribe(handleSettingsUpdate);
-        return () => unsubscribe();
-    }, [hasEnvPassword, persistEnabled]);
-
-
+        return () => { mounted = false; };
+    }, [initialHasAuth]);
 
     const handleUnlock = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsValidating(true);
 
-        const settings = settingsStore.getSettings();
-        const canPersist = hasEnvPassword && persistEnabled;
+        try {
+            const res = await fetch('/api/auth', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password }),
+            });
+            const data = await res.json();
 
-        const setUnlocked = () => {
-            if (canPersist) {
-                localStorage.setItem(SESSION_UNLOCKED_KEY, 'true');
+            if (data.valid) {
+                setSession({
+                    profileId: data.profileId,
+                    name: data.name,
+                    role: data.role,
+                    customPermissions: data.customPermissions,
+                }, data.persistSession ?? persistSession);
+
+                // Reload to re-initialize stores with profiled keys
+                window.location.reload();
+                return;
             }
-            sessionStorage.setItem(SESSION_UNLOCKED_KEY, 'true');
-            setIsLocked(false);
-            setError(false);
-            setIsValidating(false);
-        };
-
-        // First check local passwords
-        if (settings.accessPasswords.includes(password)) {
-            setUnlocked();
-            return;
-        }
-
-        // Then check env password via API
-        if (hasEnvPassword) {
-            try {
-                const res = await fetch('/api/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password }),
-                });
-                const data = await res.json();
-                if (data.valid) {
-                    setUnlocked();
-                    return;
-                }
-            } catch {
-                // API error
-            }
+        } catch {
+            // API error
         }
 
         // Password didn't match
@@ -199,9 +145,10 @@ export function PasswordGate({ children, hasEnvPassword: initialHasEnvPassword }
 
                         <button
                             type="submit"
-                            className="w-full py-3 px-4 bg-[var(--accent-color)] text-white font-bold rounded-[var(--radius-2xl)] hover:translate-y-[-2px] hover:brightness-110 shadow-[var(--shadow-sm)] hover:shadow-[0_4px_8px_var(--shadow-color)] active:translate-y-0 active:scale-[0.98] transition-all duration-200"
+                            disabled={isValidating}
+                            className="w-full py-3 px-4 bg-[var(--accent-color)] text-white font-bold rounded-[var(--radius-2xl)] hover:translate-y-[-2px] hover:brightness-110 shadow-[var(--shadow-sm)] hover:shadow-[0_4px_8px_var(--shadow-color)] active:translate-y-0 active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            解锁访问
+                            {isValidating ? '验证中...' : '登录'}
                         </button>
                     </div>
                 </form>

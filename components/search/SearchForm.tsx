@@ -12,6 +12,7 @@ interface SearchFormProps {
   checkedSources?: number;
   totalSources?: number;
   placeholder?: string;
+  isPremium?: boolean;
 }
 
 export function SearchForm({
@@ -23,6 +24,7 @@ export function SearchForm({
   checkedSources = 0,
   totalSources = 16,
   placeholder,
+  isPremium = false,
 }: SearchFormProps) {
   return (
     <div className="max-w-3xl mx-auto">
@@ -31,6 +33,7 @@ export function SearchForm({
         onClear={onClear}
         initialQuery={initialQuery}
         placeholder={placeholder}
+        isPremium={isPremium}
       />
 
       {/* Loading Animation */}

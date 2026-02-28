@@ -6,6 +6,7 @@ interface DesktopOverlayWrapperProps {
     data: ReturnType<typeof useDesktopPlayerState>['data'];
     actions: ReturnType<typeof useDesktopPlayerState>['actions'];
     showControls: boolean;
+    isRotated?: boolean;
     onTogglePlay: () => void;
     onSkipForward: () => void;
     onSkipBackward: () => void;
@@ -31,6 +32,7 @@ export function DesktopOverlayWrapper({
     data,
     actions,
     showControls,
+    isRotated = false,
     onTogglePlay,
     onSkipForward,
     onSkipBackward,
@@ -94,6 +96,7 @@ export function DesktopOverlayWrapper({
             onSpeedMenuMouseEnter={onSpeedMenuMouseEnter}
             onSpeedMenuMouseLeave={onSpeedMenuMouseLeave}
             containerRef={containerRef}
+            isRotated={isRotated}
         />
     );
 }

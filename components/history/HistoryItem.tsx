@@ -8,6 +8,7 @@ import { Icons } from '@/components/ui/Icon';
 import { formatTime, formatDate } from '@/lib/utils/format-utils';
 import { PosterImage } from './PosterImage';
 import { FavoriteButton } from '@/components/favorites/FavoriteButton';
+import { getSourceName } from '@/lib/utils/source-names';
 import type { VideoHistoryItem } from '@/lib/types';
 
 interface HistoryItemProps {
@@ -24,6 +25,15 @@ export function HistoryItem({ item, onRemove, isPremium = false }: HistoryItemPr
       title: item.title,
       episode: item.episodeIndex.toString(),
     });
+    // Pass sourceMap as groupedSources for source switching
+    if (item.sourceMap && Object.keys(item.sourceMap).length > 1) {
+      const groupData = Object.entries(item.sourceMap).map(([sourceName, videoId]) => ({
+        id: videoId,
+        source: sourceName,
+        sourceName: getSourceName(sourceName),
+      }));
+      params.set('groupedSources', JSON.stringify(groupData));
+    }
     if (isPremium) {
       params.set('premium', '1');
     }

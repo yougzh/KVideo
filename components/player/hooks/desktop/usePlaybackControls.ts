@@ -18,6 +18,8 @@ interface UsePlaybackControlsProps {
     playbackRate: number;
     setPlaybackRate: (rate: number) => void;
     setShowSpeedMenu: (show: boolean) => void;
+    volume: number;
+    isMuted: boolean;
 }
 
 export function usePlaybackControls({
@@ -35,7 +37,9 @@ export function usePlaybackControls({
     speedMenuTimeoutRef,
     playbackRate,
     setPlaybackRate,
-    setShowSpeedMenu
+    setShowSpeedMenu,
+    volume,
+    isMuted
 }: UsePlaybackControlsProps) {
     const togglePlay = useCallback(() => {
         if (!videoRef.current) return;
@@ -87,10 +91,13 @@ export function usePlaybackControls({
             videoRef.current.playbackRate = playbackRate;
         }
 
+        // Apply saved volume and mute state when new source loads
+        videoRef.current.volume = isMuted ? 0 : volume;
+
         videoRef.current.play().catch((err: Error) => {
             console.warn('Autoplay was prevented:', err);
         });
-    }, [videoRef, setDuration, setIsLoading, initialTime, playbackRate]);
+    }, [videoRef, setDuration, setIsLoading, initialTime, playbackRate, volume, isMuted]);
 
     // Handle late initialization of initialTime (e.g. from async storage hydration)
     useEffect(() => {

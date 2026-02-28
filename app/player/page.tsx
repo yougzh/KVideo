@@ -1,21 +1,23 @@
 'use client';
 
-import { Suspense, useEffect, useMemo, useState, useCallback } from 'react';
+import { Suspense, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { VideoPlayer } from '@/components/player/VideoPlayer';
 import { VideoMetadata } from '@/components/player/VideoMetadata';
 import { EpisodeList } from '@/components/player/EpisodeList';
 import { PlayerError } from '@/components/player/PlayerError';
-import { SourceSelector, SourceInfo } from '@/components/player/SourceSelector';
+import { SourceInfo } from '@/components/player/EpisodeList';
+import type { VideoSource } from '@/lib/types';
 import { useVideoPlayer } from '@/lib/hooks/useVideoPlayer';
 import { useHistory } from '@/lib/store/history-store';
 import { FavoritesSidebar } from '@/components/favorites/FavoritesSidebar';
 import { FavoriteButton } from '@/components/favorites/FavoriteButton';
 import { PlayerNavbar } from '@/components/player/PlayerNavbar';
 import { settingsStore } from '@/lib/store/settings-store';
+import { premiumModeSettingsStore } from '@/lib/store/premium-mode-settings';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
-import Image from 'next/image';
+import { getSourceName } from '@/lib/utils/source-names';
 
 function PlayerContent() {
   const searchParams = useSearchParams();
@@ -29,17 +31,18 @@ function PlayerContent() {
   const episodeParam = searchParams.get('episode');
   const groupedSourcesParam = searchParams.get('groupedSources');
 
-  // Track settings
+  // Track settings - use mode-specific store
+  const modeStore = isPremium ? premiumModeSettingsStore : settingsStore;
   const [isReversed, setIsReversed] = useState(() =>
-    typeof window !== 'undefined' ? settingsStore.getSettings().episodeReverseOrder : false
+    typeof window !== 'undefined' ? modeStore.getSettings().episodeReverseOrder : false
   );
 
   // Mobile tab state
-  const [activeTab, setActiveTab] = useState<'episodes' | 'info' | 'sources'>('episodes');
+  const [activeTab, setActiveTab] = useState<'episodes' | 'info'>('episodes');
 
   // Sync with store changes if any (though usually it's one-way from UI to store)
   useEffect(() => {
-    setIsReversed(settingsStore.getSettings().episodeReverseOrder);
+    setIsReversed(modeStore.getSettings().episodeReverseOrder);
   }, []);
 
   // Redirect if no video ID or source
@@ -47,6 +50,10 @@ function PlayerContent() {
     router.push('/');
     return null;
   }
+
+  // Handle auto-fallback when current source is unavailable (defined later, uses ref)
+  const sourceUnavailableRef = useRef<(() => void) | undefined>(undefined);
+  const pendingFallbackRef = useRef(false);
 
   const {
     videoData,
@@ -58,9 +65,13 @@ function PlayerContent() {
     setPlayUrl,
     setVideoError,
     fetchVideoDetails,
-  } = useVideoPlayer(videoId, source, episodeParam, isReversed);
+  } = useVideoPlayer(videoId, source, episodeParam, isReversed, useCallback(() => {
+    sourceUnavailableRef.current?.();
+  }, []));
 
   // Parse grouped sources if available
+  const [discoveredSources, setDiscoveredSources] = useState<SourceInfo[]>([]);
+
   const groupedSources = useMemo<SourceInfo[]>(() => {
     let sources: SourceInfo[] = [];
     if (groupedSourcesParam) {
@@ -71,20 +82,152 @@ function PlayerContent() {
       }
     }
 
+    // Merge in discovered sources (from background search)
+    if (discoveredSources.length > 0) {
+      for (const ds of discoveredSources) {
+        if (!sources.find(s => s.source === ds.source)) {
+          sources.push(ds);
+        }
+      }
+    }
+
     // Always ensure the current source is in the list
     if (source && !sources.find(s => s.source === source)) {
       sources.unshift({
         id: videoId || '',
         source: source,
-        sourceName: source,
+        sourceName: getSourceName(source),
         pic: videoData?.vod_pic
       });
     }
+
+    // Use current video's poster as fallback pic for sources that don't have one
+    const fallbackPic = videoData?.vod_pic;
+    if (fallbackPic) {
+      sources = sources.map(s => s.pic ? s : { ...s, pic: fallbackPic });
+    }
+
     return sources;
-  }, [groupedSourcesParam, source, videoId, videoData?.vod_pic]);
+  }, [groupedSourcesParam, source, videoId, videoData?.vod_pic, discoveredSources]);
+
+  // Wire up the source unavailable handler now that groupedSources is defined
+  sourceUnavailableRef.current = () => {
+    const alternatives = groupedSources.filter(s => s.source !== source);
+    if (alternatives.length === 0) {
+      // No alternatives yet — mark pending so we retry when discovered sources arrive
+      pendingFallbackRef.current = true;
+      return;
+    }
+
+    pendingFallbackRef.current = false;
+    const best = [...alternatives].sort((a, b) => {
+      const latA = a.latency ?? Infinity;
+      const latB = b.latency ?? Infinity;
+      return latA - latB;
+    })[0];
+
+    const params = new URLSearchParams();
+    params.set('id', String(best.id));
+    params.set('source', best.source);
+    params.set('title', title || '');
+    if (episodeParam) params.set('episode', episodeParam);
+    if (groupedSourcesParam) params.set('groupedSources', groupedSourcesParam);
+    if (isPremium) params.set('premium', '1');
+    router.replace(`/player?${params.toString()}`, { scroll: false });
+  };
+
+  // Retry pending fallback when discovered sources arrive
+  useEffect(() => {
+    if (pendingFallbackRef.current && discoveredSources.length > 0) {
+      sourceUnavailableRef.current?.();
+    }
+  }, [discoveredSources]);
+
+  // Background fetch alternative sources when none provided or when existing ones lack full info
+  const fetchedSourcesRef = useRef(false);
+  useEffect(() => {
+    if (fetchedSourcesRef.current || !title) return;
+
+    // Check if existing grouped sources already have full info (pic + latency)
+    let existingSources: SourceInfo[] = [];
+    if (groupedSourcesParam) {
+      try { existingSources = JSON.parse(groupedSourcesParam); } catch {}
+    }
+    // Always fetch alternatives if there's a pending fallback (source unavailable)
+    const hasFullInfo = !pendingFallbackRef.current && existingSources.length > 1 &&
+      existingSources.every(s => s.pic || s.latency !== undefined);
+    if (hasFullInfo) return;
+
+    fetchedSourcesRef.current = true;
+
+    const settings = settingsStore.getSettings();
+    const sourcesForMode = isPremium ? settings.premiumSources : settings.sources;
+    const allSources = sourcesForMode?.filter((s: VideoSource) => s.enabled !== false) || [];
+    // Only search other sources (not the current one)
+    const otherSources = allSources.filter((s: VideoSource) => s.id !== source);
+    if (otherSources.length === 0) return;
+
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const response = await fetch('/api/search-parallel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: title, sources: otherSources, page: 1 }),
+          signal: controller.signal,
+        });
+        if (!response.ok || !response.body) return;
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        const found: SourceInfo[] = [];
+        const normalizedTitle = title.toLowerCase().trim();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.type === 'videos' && data.videos) {
+                // Find exact or close title match
+                const match = data.videos.find((v: any) =>
+                  v.vod_name?.toLowerCase().trim() === normalizedTitle
+                );
+                if (match) {
+                  found.push({
+                    id: match.vod_id,
+                    source: match.source,
+                    sourceName: match.sourceDisplayName || getSourceName(match.source),
+                    latency: match.latency,
+                    pic: match.vod_pic,
+                    typeName: match.type_name,
+                  });
+                  // Update state incrementally
+                  setDiscoveredSources([...found]);
+                }
+              }
+            } catch { /* ignore parse errors */ }
+          }
+        }
+      } catch {
+        // Silently ignore - this is a background enhancement
+      }
+    })();
+
+    return () => controller.abort();
+  }, [title, source, groupedSourcesParam, isPremium]);
 
   // Track current source for switching
   const [currentSourceId, setCurrentSourceId] = useState(source);
+  const playerTimeRef = useRef(0);
 
   // Add initial history entry when video data is loaded
   useEffect(() => {
@@ -105,7 +248,8 @@ function PlayerContent() {
         0, // Initial playback position
         0, // Will be updated by VideoPlayer
         videoData.vod_pic,
-        mappedEpisodes
+        mappedEpisodes,
+        { vod_actor: videoData.vod_actor, type_name: videoData.type_name, vod_area: videoData.vod_area }
       );
     }
   }, [videoData, playUrl, videoId, currentEpisode, source, title, addToHistory]);
@@ -123,8 +267,8 @@ function PlayerContent() {
 
   const handleToggleReverse = (reversed: boolean) => {
     setIsReversed(reversed);
-    const settings = settingsStore.getSettings();
-    settingsStore.saveSettings({
+    const settings = modeStore.getSettings();
+    modeStore.saveSettings({
       ...settings,
       episodeReverseOrder: reversed
     });
@@ -180,6 +324,9 @@ function PlayerContent() {
                 onNextEpisode={handleNextEpisode}
                 isReversed={isReversed}
                 isPremium={isPremium}
+                videoTitle={videoData?.vod_name || title || ''}
+                episodeName={videoData?.episodes?.[currentEpisode]?.name || ''}
+                externalTimeRef={playerTimeRef}
               />
               <div className="hidden lg:block">
                 <VideoMetadata
@@ -213,18 +360,15 @@ function PlayerContent() {
             <div className="lg:col-span-1">
               <div className="lg:sticky lg:top-32 space-y-6">
                 {/* Mobile Tabs */}
-                {groupedSources.length > 0 && (
-                  <SegmentedControl
-                    options={[
-                      { label: '选集', value: 'episodes' },
-                      { label: '简介', value: 'info' },
-                      ...(groupedSources.length > 1 ? [{ label: '来源', value: 'sources' as const }] : []),
-                    ]}
-                    value={activeTab}
-                    onChange={setActiveTab}
-                    className="lg:hidden mb-4"
-                  />
-                )}
+                <SegmentedControl
+                  options={[
+                    { label: '选集', value: 'episodes' },
+                    { label: '简介', value: 'info' },
+                  ]}
+                  value={activeTab}
+                  onChange={setActiveTab}
+                  className="lg:hidden mb-4"
+                />
 
                 {/* Info Tab Content - Mobile Only */}
                 <div className={activeTab !== 'info' ? 'hidden' : 'block lg:hidden'}>
@@ -235,7 +379,7 @@ function PlayerContent() {
                   />
                 </div>
 
-                {/* Episode List - Visible if desktop OR active mobile tab */}
+                {/* Episode List with integrated source selector - Visible if desktop OR active mobile tab */}
                 <div className={activeTab !== 'episodes' ? 'hidden lg:block' : 'block'}>
                   <EpisodeList
                     episodes={videoData?.episodes || null}
@@ -243,30 +387,34 @@ function PlayerContent() {
                     isReversed={isReversed}
                     onEpisodeClick={handleEpisodeClick}
                     onToggleReverse={handleToggleReverse}
+                    sources={groupedSources.length > 0 ? groupedSources : undefined}
+                    currentSource={currentSourceId || source || ''}
+                    onSourceChange={(newSource) => {
+                      const params = new URLSearchParams();
+                      params.set('id', String(newSource.id));
+                      params.set('source', newSource.source);
+                      params.set('title', title || '');
+                      // Preserve current episode index
+                      params.set('episode', currentEpisode.toString());
+                      // Preserve playback position for seamless source switch
+                      if (playerTimeRef.current > 1) {
+                        params.set('t', Math.floor(playerTimeRef.current).toString());
+                      }
+                      // Pass all known sources so switching persists
+                      const allSources = groupedSources.length > 0 ? groupedSources : [];
+                      if (allSources.length > 1) {
+                        params.set('groupedSources', JSON.stringify(allSources));
+                      } else if (groupedSourcesParam) {
+                        params.set('groupedSources', groupedSourcesParam);
+                      }
+                      if (isPremium) {
+                        params.set('premium', '1');
+                      }
+                      setCurrentSourceId(newSource.source);
+                      router.replace(`/player?${params.toString()}`, { scroll: false });
+                    }}
                   />
                 </div>
-
-                {/* Source Selector - Visible if (desktop AND grouped sources) OR (active mobile tab AND grouped sources) */}
-                {groupedSources.length > 0 && (
-                  <div className={activeTab !== 'sources' ? 'hidden lg:block' : 'block'}>
-                    <SourceSelector
-                      sources={groupedSources}
-                      currentSource={currentSourceId || source || ''}
-                      onSourceChange={(newSource) => {
-                        // Navigate to same video with different source
-                        const params = new URLSearchParams();
-                        params.set('id', String(newSource.id));
-                        params.set('source', newSource.source);
-                        params.set('title', title || '');
-                        if (groupedSourcesParam) {
-                          params.set('groupedSources', groupedSourcesParam);
-                        }
-                        setCurrentSourceId(newSource.source);
-                        router.replace(`/player?${params.toString()}`, { scroll: false });
-                      }}
-                    />
-                  </div>
-                )}
               </div>
             </div>
           </div>

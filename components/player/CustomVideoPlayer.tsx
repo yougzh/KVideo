@@ -15,6 +15,9 @@ interface CustomVideoPlayerProps {
   currentEpisodeIndex?: number;
   onNextEpisode?: () => void;
   isReversed?: boolean;
+  // Danmaku props
+  videoTitle?: string;
+  episodeName?: string;
 }
 
 /**

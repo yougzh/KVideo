@@ -5,7 +5,9 @@
     left: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
-    z-index: 9999 !important;
+    height: 100dvh !important;
+    /* Fallback for browsers supporting dvh */
+    z-index: 2147483647 !important;
     background: black !important;
     border-radius: 0 !important;
 }
@@ -14,5 +16,16 @@
 .kvideo-container.is-web-fullscreen video {
     width: 100% !important;
     height: 100% !important;
+    border-radius: 0 !important;
+}
+
+/* Force Landscape Mode for Mobile (iOS mainly) */
+.kvideo-container.is-web-fullscreen.force-landscape {
+    width: 100vh !important;
+    width: 100dvh !important;
+    height: 100vw !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) rotate(90deg) !important;
     border-radius: 0 !important;
 }

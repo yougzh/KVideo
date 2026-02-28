@@ -55,47 +55,87 @@ export async function POST(request: NextRequest) {
         // Track progress
         let completedSources = 0;
         let totalVideosFound = 0;
+        let maxPageCount = 1;
 
         // Search all sources in PARALLEL - don't wait for all to finish
         const searchPromises = sources.map(async (source: any) => {
           const startTime = performance.now(); // Track start time
           try {
 
-
-            // Search this source
-            const result = await searchVideos(query.trim(), [source], page);
+            // Search page 1 for this source
+            const result = await searchVideos(query.trim(), [source], 1);
             const endTime = performance.now(); // Track end time
             const latency = Math.round(endTime - startTime); // Calculate latency in ms
             const videos = result[0]?.results || [];
+            const pagecount = result[0]?.pagecount ?? 1;
 
             completedSources++;
             totalVideosFound += videos.length;
 
-
-
-            // Stream videos immediately as they arrive WITH latency data
+            // Stream page 1 videos immediately
             if (videos.length > 0) {
               controller.enqueue(encoder.encode(`data: ${JSON.stringify({
                 type: 'videos',
                 videos: videos.map((video: any) => ({
                   ...video,
                   sourceDisplayName: getSourceName(source.id),
-                  latency, // Add latency to each video
+                  latency,
                 })),
                 source: source.id,
                 completedSources,
                 totalSources: sources.length,
-                latency, // Also include at source level
+                latency,
               })}\n\n`));
             }
 
-            // Send progress update
+            // Send progress update for page 1
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({
               type: 'progress',
               completedSources,
               totalSources: sources.length,
               totalVideosFound
             })}\n\n`));
+
+            // Auto-fetch remaining pages if pagecount > 1
+            if (pagecount > 1) {
+              const remainingPages = Array.from({ length: pagecount - 1 }, (_, i) => i + 2);
+              const pagePromises = remainingPages.map(async (pg) => {
+                try {
+                  const pageResult = await searchVideos(query.trim(), [source], pg);
+                  const pageVideos = pageResult[0]?.results || [];
+
+                  totalVideosFound += pageVideos.length;
+
+                  if (pageVideos.length > 0) {
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                      type: 'videos',
+                      videos: pageVideos.map((video: any) => ({
+                        ...video,
+                        sourceDisplayName: getSourceName(source.id),
+                        latency,
+                      })),
+                      source: source.id,
+                      completedSources,
+                      totalSources: sources.length,
+                      latency,
+                    })}\n\n`));
+                  }
+
+                  // Progress update for each additional page
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({
+                    type: 'progress',
+                    completedSources,
+                    totalSources: sources.length,
+                    totalVideosFound
+                  })}\n\n`));
+
+                } catch (pageError) {
+                  console.error(`[Search Parallel] Source ${source.id} page ${pg} failed:`, pageError);
+                }
+              });
+
+              await Promise.all(pagePromises);
+            }
 
           } catch (error) {
             const endTime = performance.now();
@@ -122,7 +162,8 @@ export async function POST(request: NextRequest) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({
           type: 'complete',
           totalVideosFound,
-          totalSources: sources.length
+          totalSources: sources.length,
+          maxPageCount
         })}\n\n`));
 
         controller.close();
