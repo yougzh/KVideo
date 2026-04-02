@@ -15,6 +15,7 @@ const PERSIST_SESSION = process.env.PERSIST_SESSION !== 'false'; // default true
 const SUBSCRIPTION_SOURCES = process.env.SUBSCRIPTION_SOURCES || process.env.NEXT_PUBLIC_SUBSCRIPTION_SOURCES || '';
 const IPTV_SOURCES = process.env.IPTV_SOURCES || process.env.NEXT_PUBLIC_IPTV_SOURCES || '';
 const MERGE_SOURCES = process.env.MERGE_SOURCES || process.env.NEXT_PUBLIC_MERGE_SOURCES || '';
+const DANMAKU_API_URL = process.env.DANMAKU_API_URL || process.env.NEXT_PUBLIC_DANMAKU_API_URL || '';
 
 // Backward compat: ACCESS_PASSWORD acts as ADMIN_PASSWORD if ADMIN_PASSWORD is not set
 const effectiveAdminPassword = ADMIN_PASSWORD || ACCESS_PASSWORD;
@@ -73,6 +74,7 @@ export async function GET() {
     subscriptionSources: SUBSCRIPTION_SOURCES,
     iptvSources: IPTV_SOURCES,
     mergeSources: MERGE_SOURCES,
+    danmakuApiUrl: DANMAKU_API_URL,
   });
 }
 

@@ -247,6 +247,7 @@ export function VideoPlayer({
           isReversed={isReversed}
           videoTitle={videoTitle}
           episodeName={episodeName}
+          isPremium={isPremium}
           onResolutionDetected={onResolutionDetected}
         />
       )}

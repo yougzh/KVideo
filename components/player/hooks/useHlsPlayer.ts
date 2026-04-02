@@ -6,6 +6,7 @@ import { filterM3u8Ad } from '@/lib/utils/m3u8-utils';
 interface UseHlsPlayerProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
     src: string;
+    isPremium?: boolean;
     autoPlay?: boolean;
     onAutoPlayPrevented?: (error: Error) => void;
     onError?: (message: string) => void;
@@ -14,12 +15,13 @@ interface UseHlsPlayerProps {
 export function useHlsPlayer({
     videoRef,
     src,
+    isPremium = false,
     autoPlay = false,
     onAutoPlayPrevented,
     onError
 }: UseHlsPlayerProps) {
     const hlsRef = useRef<Hls | null>(null);
-    const { adFilterMode, adKeywords } = usePlayerSettings();
+    const { adFilterMode, adKeywords } = usePlayerSettings(isPremium);
     const isAdFilterEnabled = adFilterMode !== 'off';
 
     useEffect(() => {

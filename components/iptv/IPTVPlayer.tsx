@@ -12,6 +12,7 @@ import Hls from 'hls.js';
 import { Icons } from '@/components/ui/Icon';
 import type { M3UChannel } from '@/lib/utils/m3u-parser';
 import type { IPTVSource } from '@/lib/store/iptv-store';
+import { settingsStore, DEFAULT_SEEK_STEP_SECONDS } from '@/lib/store/settings-store';
 
 const HLS_LIVE_CONFIG: Partial<Hls['config']> = {
   enableWorker: true,
@@ -96,6 +97,7 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange, channe
   const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showAllRoutes, setShowAllRoutes] = useState(false);
+  const [seekStepSeconds, setSeekStepSeconds] = useState(DEFAULT_SEEK_STEP_SECONDS);
 
   // Multi-level sidebar state
   const [expandedSources, setExpandedSources] = useState<Set<string>>(new Set());
@@ -118,6 +120,16 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange, channe
       activeChannelRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   }, [showSidebar, channel.url]);
+
+  useEffect(() => {
+    const syncSeekStep = () => {
+      setSeekStepSeconds(settingsStore.getSettings().seekStepSeconds ?? DEFAULT_SEEK_STEP_SECONDS);
+    };
+
+    syncSeekStep();
+    const unsubscribe = settingsStore.subscribe(syncSeekStep);
+    return () => unsubscribe();
+  }, []);
 
   // Auto-expand the source/group containing the active channel
   useEffect(() => {
@@ -506,14 +518,14 @@ export function IPTVPlayer({ channel, onClose, channels, onChannelChange, channe
         case 'l':
           e.preventDefault();
           if (!isLive && isFinite(video.duration)) {
-            video.currentTime = Math.min(video.duration, video.currentTime + 10);
+            video.currentTime = Math.min(video.duration, video.currentTime + seekStepSeconds);
           }
           break;
         case 'arrowleft':
         case 'j':
           e.preventDefault();
           if (!isLive && isFinite(video.duration)) {
-            video.currentTime = Math.max(0, video.currentTime - 10);
+            video.currentTime = Math.max(0, video.currentTime - seekStepSeconds);
           }
           break;
         case 'arrowup':
