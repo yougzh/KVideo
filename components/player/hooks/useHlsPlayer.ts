@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import Hls from 'hls.js';
 import { usePlayerSettings } from './usePlayerSettings';
 import { filterM3u8Ad } from '@/lib/utils/m3u8-utils';
+import { useRuntimeFeatures } from '@/components/RuntimeFeaturesProvider';
 
 interface UseHlsPlayerProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -22,6 +23,7 @@ export function useHlsPlayer({
 }: UseHlsPlayerProps) {
     const hlsRef = useRef<Hls | null>(null);
     const { adFilterMode, adKeywords } = usePlayerSettings(isPremium);
+    const { mediaProxyEnabled } = useRuntimeFeatures();
     const isAdFilterEnabled = adFilterMode !== 'off';
 
     useEffect(() => {
@@ -225,6 +227,9 @@ export function useHlsPlayer({
                         if (!res.ok) throw new Error(`HTTP ${res.status}`);
                         return await res.text();
                     } catch (e) {
+                        if (!mediaProxyEnabled) {
+                            throw e;
+                        }
                         console.warn(`[HLS Native] Fetch failed for ${url}, trying proxy...`, e);
                         const proxiedUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
                         const res = await fetch(proxiedUrl);
@@ -397,6 +402,10 @@ export function useHlsPlayer({
             const handleError = () => {
                 if (directFailed) return;
                 directFailed = true;
+                if (!mediaProxyEnabled) {
+                    onError?.('当前浏览器不支持 HLS 视频播放。建议使用 Chrome、Edge 或 Safari 浏览器。');
+                    return;
+                }
                 // Try proxied URL as final attempt
                 const proxiedUrl = `/api/proxy?url=${encodeURIComponent(src)}`;
                 video.src = proxiedUrl;
@@ -415,5 +424,5 @@ export function useHlsPlayer({
             }
             extraBlobs.forEach(url => URL.revokeObjectURL(url));
         };
-    }, [src, videoRef, autoPlay, onAutoPlayPrevented, onError, isAdFilterEnabled, adFilterMode, adKeywords]);
+    }, [src, videoRef, autoPlay, onAutoPlayPrevented, onError, isAdFilterEnabled, adFilterMode, adKeywords, mediaProxyEnabled]);
 }

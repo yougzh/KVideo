@@ -10,6 +10,7 @@ import {
     premiumModeSettingsStore,
     type ModeSettings,
 } from '@/lib/store/premium-mode-settings';
+import { useRuntimeFeatures } from '@/components/RuntimeFeaturesProvider';
 
 interface PlayerSettingsSnapshot {
     autoNextEpisode: boolean;
@@ -30,7 +31,7 @@ interface PlayerSettingsSnapshot {
     danmakuDisplayArea: number;
 }
 
-function getPlayerSettingsSnapshot(isPremium: boolean): PlayerSettingsSnapshot {
+function getPlayerSettingsSnapshot(isPremium: boolean, mediaProxyEnabled: boolean): PlayerSettingsSnapshot {
     const globalSettings = settingsStore.getSettings();
     const modeSettings = isPremium ? premiumModeSettingsStore.getSettings() : globalSettings;
 
@@ -45,7 +46,7 @@ function getPlayerSettingsSnapshot(isPremium: boolean): PlayerSettingsSnapshot {
         adFilterMode: modeSettings.adFilterMode,
         adKeywords: globalSettings.adKeywords,
         fullscreenType: modeSettings.fullscreenType,
-        proxyMode: modeSettings.proxyMode,
+        proxyMode: mediaProxyEnabled ? modeSettings.proxyMode : 'none',
         danmakuEnabled: modeSettings.danmakuEnabled,
         danmakuApiUrl: modeSettings.danmakuApiUrl,
         danmakuOpacity: modeSettings.danmakuOpacity,
@@ -59,12 +60,13 @@ function getPlayerSettingsSnapshot(isPremium: boolean): PlayerSettingsSnapshot {
  * Provides reactive updates when settings change
  */
 export function usePlayerSettings(isPremium: boolean = false) {
-    const [settings, setSettings] = useState(() => getPlayerSettingsSnapshot(isPremium));
+    const { mediaProxyEnabled } = useRuntimeFeatures();
+    const [settings, setSettings] = useState(() => getPlayerSettingsSnapshot(isPremium, mediaProxyEnabled));
 
     // Subscribe to settings changes
     useEffect(() => {
         const syncSettings = () => {
-            setSettings(getPlayerSettingsSnapshot(isPremium));
+            setSettings(getPlayerSettingsSnapshot(isPremium, mediaProxyEnabled));
         };
 
         const modeStore = isPremium ? premiumModeSettingsStore : settingsStore;
@@ -77,7 +79,7 @@ export function usePlayerSettings(isPremium: boolean = false) {
             unsubscribeModeStore();
             unsubscribeGlobalStore?.();
         };
-    }, [isPremium]);
+    }, [isPremium, mediaProxyEnabled]);
 
     const updateModeSettings = useCallback((partial: Partial<ModeSettings>) => {
         if (isPremium) {
@@ -145,8 +147,8 @@ export function usePlayerSettings(isPremium: boolean = false) {
     }, [updateModeSettings]);
 
     const setProxyMode = useCallback((value: 'retry' | 'none' | 'always') => {
-        updateModeSettings({ proxyMode: value });
-    }, [updateModeSettings]);
+        updateModeSettings({ proxyMode: mediaProxyEnabled ? value : 'none' });
+    }, [mediaProxyEnabled, updateModeSettings]);
 
     const setDanmakuEnabled = useCallback((value: boolean) => {
         updateModeSettings({ danmakuEnabled: value });

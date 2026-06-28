@@ -11,6 +11,7 @@ import { AccountSettings } from '@/components/settings/AccountSettings';
 import { DisplaySettings } from '@/components/settings/DisplaySettings';
 import { PlayerSettings } from '@/components/settings/PlayerSettings';
 import { SettingsHeader } from '@/components/settings/SettingsHeader';
+import { AppVersionSettings } from '@/components/settings/AppVersionSettings';
 import { UserSourceSettings } from '@/components/settings/UserSourceSettings';
 import { UserDanmakuSettings } from '@/components/settings/UserDanmakuSettings';
 import { PermissionGate } from '@/components/PermissionGate';
@@ -57,7 +58,9 @@ export default function SettingsPage() {
     handleProxyModeChange,
     handleSeekStepSecondsChange,
     rememberScrollPosition,
+    videoTogetherEnabled,
     handleRememberScrollPositionChange,
+    handleVideoTogetherEnabledChange,
     locale,
     handleLocaleChange,
     danmakuApiUrl,
@@ -78,6 +81,8 @@ export default function SettingsPage() {
         {/* Header */}
         <SettingsHeader />
 
+        <AppVersionSettings />
+
         {/* Account Settings */}
         <AccountSettings />
 
@@ -90,6 +95,8 @@ export default function SettingsPage() {
             onProxyModeChange={handleProxyModeChange}
             seekStepSeconds={seekStepSeconds}
             onSeekStepSecondsChange={handleSeekStepSecondsChange}
+            videoTogetherEnabled={videoTogetherEnabled}
+            onVideoTogetherEnabledChange={handleVideoTogetherEnabledChange}
             danmakuApiUrl={danmakuApiUrl}
             onDanmakuApiUrlChange={handleDanmakuApiUrlChange}
             danmakuOpacity={danmakuOpacity}
