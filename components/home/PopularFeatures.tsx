@@ -6,12 +6,21 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { TagManager } from './TagManager';
 import { MovieGrid } from './MovieGrid';
+import { CategoryQuickSearch } from './CategoryQuickSearch';
 import { useTagManager } from './hooks/useTagManager';
 import { usePopularMovies } from './hooks/usePopularMovies';
 import { usePersonalizedRecommendations } from './hooks/usePersonalizedRecommendations';
+
+interface DoubanMovie {
+  id: string;
+  title: string;
+  cover: string;
+  rate: string;
+  url: string;
+}
 
 interface PopularFeaturesProps {
   onSearch?: (query: string) => void;
@@ -46,17 +55,7 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
     loadMoreRef: recommendLoadMoreRef,
   } = usePersonalizedRecommendations(false);
 
-  // Track whether the recommendation tab is active
-  const [isRecommendSelected, setIsRecommendSelected] = useState(hasHistory);
-
-  // Sync selection when hasHistory changes after Zustand hydration from localStorage.
-  // On first render the store is empty (hasHistory=false), so useState captures false.
-  // Once hydration completes and hasHistory becomes true, auto-select the recommendation tab.
-  useEffect(() => {
-    if (hasHistory) {
-      setIsRecommendSelected(true);
-    }
-  }, [hasHistory]);
+  const [isRecommendSelected, setIsRecommendSelected] = useState(false);
 
   const effectiveRecommendSelected = hasHistory && isRecommendSelected;
 
@@ -72,7 +71,7 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
     contentType
   );
 
-  const handleMovieClick = (movie: any) => {
+  const handleMovieClick = (movie: DoubanMovie) => {
     if (onSearch) {
       onSearch(movie.title);
     }
@@ -93,6 +92,8 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
 
   return (
     <div className="animate-fade-in">
+      <CategoryQuickSearch onSearch={onSearch} />
+
       {/* Content Type Toggle (Capsule Liquid Glass - Fixed & Centered) */}
       {!effectiveRecommendSelected && (
         <div className="mb-10 flex justify-center">

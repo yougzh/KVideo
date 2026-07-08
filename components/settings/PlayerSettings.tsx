@@ -170,43 +170,57 @@ export function PlayerSettings({
                         控制视频播放时的网络请求策略
                     </p>
                     {mediaProxyEnabled ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <button
-                                onClick={() => onProxyModeChange('retry')}
-                                className={`px-4 py-3 rounded-[var(--radius-2xl)] border text-left font-medium transition-all duration-200 cursor-pointer ${effectiveProxyMode === 'retry'
-                                    ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-white shadow-[0_4px_12px_rgba(var(--accent-color-rgb),0.3)]'
-                                    : 'bg-[var(--glass-bg)] border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)]'
-                                    }`}
-                            >
-                                <div className="font-semibold">智能重试 (推荐)</div>
-                                <div className="text-sm opacity-80 mt-1">直连优先，失败时尝试代理</div>
-                            </button>
-                            <button
-                                onClick={() => onProxyModeChange('none')}
-                                className={`px-4 py-3 rounded-[var(--radius-2xl)] border text-left font-medium transition-all duration-200 cursor-pointer ${effectiveProxyMode === 'none'
-                                    ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-white shadow-[0_4px_12px_rgba(var(--accent-color-rgb),0.3)]'
-                                    : 'bg-[var(--glass-bg)] border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)]'
-                                    }`}
-                            >
-                                <div className="font-semibold">仅直连</div>
-                                <div className="text-sm opacity-80 mt-1">不使用代理，失败则报错</div>
-                            </button>
-                            <button
-                                onClick={() => onProxyModeChange('always')}
-                                className={`px-4 py-3 rounded-[var(--radius-2xl)] border text-left font-medium transition-all duration-200 cursor-pointer ${effectiveProxyMode === 'always'
-                                    ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-white shadow-[0_4px_12px_rgba(var(--accent-color-rgb),0.3)]'
-                                    : 'bg-[var(--glass-bg)] border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)]'
-                                    }`}
-                            >
-                                <div className="font-semibold">总是代理</div>
-                                <div className="text-sm opacity-80 mt-1">所有请求都通过代理转发</div>
-                            </button>
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <button
+                                    onClick={() => onProxyModeChange('retry')}
+                                    className={`px-4 py-3 rounded-[var(--radius-2xl)] border text-left font-medium transition-all duration-200 cursor-pointer ${effectiveProxyMode === 'retry'
+                                        ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-white shadow-[0_4px_12px_rgba(var(--accent-color-rgb),0.3)]'
+                                        : 'bg-[var(--glass-bg)] border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)]'
+                                        }`}
+                                >
+                                    <div className="font-semibold">智能重试 (推荐)</div>
+                                    <div className="text-sm opacity-80 mt-1">直连优先，失败时尝试代理</div>
+                                </button>
+                                <button
+                                    onClick={() => onProxyModeChange('none')}
+                                    className={`px-4 py-3 rounded-[var(--radius-2xl)] border text-left font-medium transition-all duration-200 cursor-pointer ${effectiveProxyMode === 'none'
+                                        ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-white shadow-[0_4px_12px_rgba(var(--accent-color-rgb),0.3)]'
+                                        : 'bg-[var(--glass-bg)] border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)]'
+                                        }`}
+                                >
+                                    <div className="font-semibold">仅直连</div>
+                                    <div className="text-sm opacity-80 mt-1">不使用代理，失败则报错</div>
+                                </button>
+                                <button
+                                    onClick={() => onProxyModeChange('always')}
+                                    className={`px-4 py-3 rounded-[var(--radius-2xl)] border text-left font-medium transition-all duration-200 cursor-pointer ${effectiveProxyMode === 'always'
+                                        ? 'bg-[var(--accent-color)] border-[var(--accent-color)] text-white shadow-[0_4px_12px_rgba(var(--accent-color-rgb),0.3)]'
+                                        : 'bg-[var(--glass-bg)] border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)]'
+                                        }`}
+                                >
+                                    <div className="font-semibold">总是代理</div>
+                                    <div className="text-sm opacity-80 mt-1">所有请求都通过代理转发</div>
+                                </button>
+                            </div>
+                            <div className="rounded-[var(--radius-2xl)] border border-[var(--glass-border)] bg-[color-mix(in_srgb,var(--glass-bg)_70%,transparent)] px-4 py-3">
+                                <div className="text-sm font-semibold text-[var(--text-color)]">内置代理端点</div>
+                                <code className="mt-1 block break-all rounded-[var(--radius-lg)] bg-black/20 px-3 py-2 text-xs text-[var(--text-color)]">
+                                    /api/proxy?url=&lt;encoded-video-url&gt;
+                                </code>
+                                <div className="mt-2 text-sm text-[var(--text-color-secondary)]">
+                                    此处不是第三方 HTTP/SOCKS 代理配置。播放器会按上方模式把播放地址交给当前 KVideo 部署的内置代理；该能力只在 Docker 或传统 Node.js 自托管完整模式下启用。
+                                </div>
+                            </div>
                         </div>
                     ) : (
                         <div className="rounded-[var(--radius-2xl)] border border-amber-500/30 bg-amber-500/10 px-4 py-3">
                             <div className="font-semibold text-[var(--text-color)]">当前部署仅支持直连播放</div>
                             <div className="text-sm text-[var(--text-color-secondary)] mt-1">
                                 {restrictionSummary}
+                            </div>
+                            <div className="mt-2 text-xs text-[var(--text-color-secondary)]">
+                                内置代理端点为 /api/proxy，但当前部署模式已禁用该端点。
                             </div>
                         </div>
                     )}

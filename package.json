@@ -1,11 +1,11 @@
 {
   "name": "kvideo",
-  "version": "4.9.2",
+  "version": "4.9.4",
   "private": true,
   "scripts": {
-    "dev": "next dev --port ${PORT:-3000}",
+    "dev": "node scripts/next-with-lan-access.mjs dev",
     "build": "next build --webpack",
-    "start": "next start --port ${PORT:-3000}",
+    "start": "node scripts/next-with-lan-access.mjs start",
     "lint": "eslint",
     "test": "tsx --test tests/**/*.test.ts",
     "pages:build": "next-on-pages"

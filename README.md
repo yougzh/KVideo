@@ -611,6 +611,43 @@ PORT=8080 npm run start
 docker run -e PORT=8080 -p 8080:8080 --name kvideo kuekhaoyang/kvideo:latest
 ```
 
+## 局域网 IP 访问
+
+通过 `ALLOW_LAN_ACCESS` 环境变量控制本机开发或传统 Node.js 自托管时是否允许同一局域网设备直接访问当前设备 IP。
+
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| `ALLOW_LAN_ACCESS` | 设为 `true` / `1` / `yes` / `on` 时，`npm run dev` 和 `npm run start` 会绑定 `0.0.0.0`，并在开发模式下放行常见内网 IPv4 来源；未开启时默认只绑定 `localhost` | `false` |
+| `NEXT_PUBLIC_ALLOW_LAN_ACCESS` | `ALLOW_LAN_ACCESS` 的构建时兼容名称；优先使用 `ALLOW_LAN_ACCESS` | `false` |
+| `LAN_ALLOWED_DEV_ORIGINS` | 追加 Next.js 开发模式允许访问 dev 资源的主机名或通配符，逗号、空格或换行分隔 | - |
+
+**示例：**
+
+```bash
+# 开发模式允许同局域网设备访问
+ALLOW_LAN_ACCESS=true npm run dev
+
+# 传统 Node.js 生产模式允许同局域网设备访问
+ALLOW_LAN_ACCESS=true npm run start
+
+# 追加自定义开发来源；Next.js 需要主机名，不要填写路径
+ALLOW_LAN_ACCESS=true LAN_ALLOWED_DEV_ORIGINS="kvideo.lan,192.168.50.10" npm run dev
+```
+
+开启后访问地址通常是 `http://<当前设备内网 IP>:3000`。如果仍然无法访问，优先检查系统防火墙、路由器客户端隔离、端口映射、反向代理监听地址以及实际运行端口；这些不是 KVideo 前端代码可以绕过的问题。Docker 镜像已经在容器内绑定 `0.0.0.0`，是否能从局域网访问主要取决于 `-p` 端口映射和宿主机网络策略。
+
+## 内置媒体代理说明
+
+设置页的“代理播放模式”使用的是当前 KVideo 部署内置的 `/api/proxy` 媒体转发端点，不是让用户填写第三方 HTTP/SOCKS 代理服务器。
+
+| 模式 | 行为 |
+|------|------|
+| 智能重试 | 优先直连，播放失败后自动切换到 `/api/proxy` |
+| 仅直连 | 不使用 `/api/proxy`，失败时直接报错 |
+| 总是代理 | 播放地址始终通过 `/api/proxy` 转发 |
+
+`/api/proxy?url=<encoded-video-url>` 只在 Docker 或传统 Node.js 自托管完整模式下启用。Vercel / Cloudflare 托管部署运行合规模式，会禁用外部媒体代理、热链转发和 IPTV 流中继；这种部署环境下设置页会显示仅支持直连播放。
+
 ## 自定义源 JSON 格式
 
 如果你想创建自己的订阅源或批量导入源，可以使用以下 JSON 格式。
@@ -689,6 +726,8 @@ docker run -e PORT=8080 -p 8080:8080 --name kvideo kuekhaoyang/kvideo:latest
 | `PREMIUM_PASSWORD` | 高级内容独立密码，访问 `/premium` 时需输入 | - |
 | `PERSIST_SESSION` | 是否持久化登录会话 | `true` |
 | `PORT` | 自定义应用端口 | `3000` |
+| `ALLOW_LAN_ACCESS` / `NEXT_PUBLIC_ALLOW_LAN_ACCESS` | 允许同局域网设备通过当前设备 IP 访问本机开发或传统 Node.js 自托管服务 | `false` |
+| `LAN_ALLOWED_DEV_ORIGINS` / `NEXT_PUBLIC_LAN_ALLOWED_DEV_ORIGINS` | 追加 Next.js 开发模式允许访问 dev 资源的主机名或通配符 | - |
 | `NEXT_PUBLIC_SITE_TITLE` | 浏览器标签页标题 | `KVideo - 视频聚合平台` |
 | `NEXT_PUBLIC_SITE_DESCRIPTION` | 站点描述 | `视频聚合平台` |
 | `NEXT_PUBLIC_SITE_NAME` | 站点头部名称 | `KVideo` |
@@ -822,6 +861,8 @@ npm start
 ```
 
 应用将在 `http://localhost:3000` 启动。
+
+同一局域网设备需要直接访问当前设备 IP 时，使用 `ALLOW_LAN_ACCESS=true npm run start`，并确认系统防火墙允许入站访问对应端口。
 
 #### 选项 3：Vercel / Cloudflare 托管部署（合规模式）
 

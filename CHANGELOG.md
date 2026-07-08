@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.9.4 - 2026-07-08
+
+- 设置页的代理播放区域显示内置 `/api/proxy` 端点和部署限制，明确该功能不是第三方 HTTP/SOCKS 代理服务器配置。
+- 新增 `ALLOW_LAN_ACCESS` 环境变量：开启后 `npm run dev` / `npm run start` 会绑定 `0.0.0.0`，开发模式会放行常见内网 IPv4 来源。
+- 新增 `LAN_ALLOWED_DEV_ORIGINS`，允许自定义 Next.js 开发模式的额外来源主机。
+- README 补充局域网访问和内置媒体代理说明，并同步修正 Docker hostname 注释。
+
 ## 4.9.3 - 2026-04-15
 
 - 新增 Redis 托管账户模式：支持用户名密码登录、超级管理员账户 CRUD、权限编辑和密码重置。
