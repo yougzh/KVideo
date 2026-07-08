@@ -16,6 +16,7 @@ import { useIsIOS, useIsMobile } from '@/lib/hooks/mobile/useDeviceDetection';
 import { useDoubleTap } from '@/lib/hooks/mobile/useDoubleTap';
 import { settingsStore, DEFAULT_SEEK_STEP_SECONDS } from '@/lib/store/settings-store';
 import { premiumModeSettingsStore } from '@/lib/store/premium-mode-settings';
+import { shouldHidePlayerCursor } from '@/lib/player/cursor-visibility';
 import './web-fullscreen.css';
 
 type WebFullscreenSize = 'full' | 'large' | 'focused';
@@ -312,6 +313,18 @@ export function DesktopVideoPlayer({
     };
   }, [data.fullscreenMode, shouldForceLandscape, viewportMetrics, webFullscreenSize]);
 
+  const shouldHideCursor = shouldHidePlayerCursor({
+    isFullscreen: data.isFullscreen,
+    isPlaying: data.isPlaying,
+    showControls: data.showControls,
+    hasInteractiveOverlay: data.showSpeedMenu || data.showMoreMenu || data.showVolumeBar,
+  });
+
+  const containerStyle = React.useMemo<React.CSSProperties>(() => ({
+    ...(webFullscreenStyle ?? {}),
+    cursor: shouldHideCursor ? 'none' : undefined,
+  }), [webFullscreenStyle, shouldHideCursor]);
+
   const stageClassName = data.fullscreenMode === 'window'
     ? 'kvideo-stage kvideo-web-fullscreen-stage'
     : 'kvideo-stage absolute inset-0';
@@ -344,7 +357,7 @@ export function DesktopVideoPlayer({
       ref={containerRef}
       className={`kvideo-container relative aspect-video bg-black group ${data.fullscreenMode === 'window' ? 'is-web-fullscreen' : ''
         } ${shouldForceLandscape ? 'force-landscape' : ''} ${isTopAlignedWebFullscreen ? 'top-align-stage' : ''} overflow-hidden rounded-none sm:rounded-[var(--radius-2xl)]`}
-      style={webFullscreenStyle}
+      style={containerStyle}
       onMouseMove={() => { handleMouseMove(); }}
       onMouseLeave={() => isPlaying && setShowControls(false)}
     >
