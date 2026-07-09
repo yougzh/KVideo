@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Lock, User } from 'lucide-react';
 import { clearSession, getSession, setSession, type AuthSession } from '@/lib/store/auth-store';
+import { resolvePasswordGateState } from '@/lib/auth/password-gate-state';
 import { useSubscriptionSync } from '@/lib/hooks/useSubscriptionSync';
 import { hasStoredAppSetting, settingsStore } from '@/lib/store/settings-store';
 import { useIPTVStore } from '@/lib/store/iptv-store';
@@ -147,31 +148,34 @@ export function PasswordGate({
         setLoginMode(config.loginMode || 'none');
         applyRuntimeConfig(config);
 
-        if (sessionStatus.authenticated && sessionStatus.session) {
-          const session = toAuthSession(sessionStatus.session);
-          const hasMatchingMirror = mirroredSession &&
-            mirroredSession.accountId === session.accountId &&
-            mirroredSession.profileId === session.profileId;
+        const serverSession = sessionStatus.authenticated && sessionStatus.session
+          ? toAuthSession(sessionStatus.session)
+          : null;
+        const gateState = resolvePasswordGateState({
+          hasAuth: !!config.hasAuth,
+          serverSession,
+          mirroredSession,
+          persistSession: config.persistSession,
+        });
 
-          setSession(session, config.persistSession);
-
-          if (!hasMatchingMirror) {
-            window.location.reload();
-            return;
-          }
-
+        if (gateState.action === 'unlock-session') {
+          setSession(gateState.session, gateState.persistSession);
           setIsLocked(false);
           setIsClient(true);
           return;
         }
 
-        if (mirroredSession) {
-          clearSession();
-          window.location.reload();
+        if (gateState.action === 'unlock-public') {
+          setIsLocked(false);
+          setIsClient(true);
           return;
         }
 
-        setIsLocked(!!config.hasAuth);
+        if (gateState.clearMirroredSession) {
+          clearSession();
+        }
+
+        setIsLocked(true);
         setIsClient(true);
       } catch {
         if (!mounted) return;
@@ -205,7 +209,9 @@ export function PasswordGate({
 
       if (data.valid && data.session) {
         setSession(toAuthSession(data.session), data.persistSession ?? persistSession);
-        window.location.reload();
+        setIsLocked(false);
+        setIsClient(true);
+        setIsValidating(false);
         return;
       }
     } catch {

@@ -38,6 +38,15 @@ export interface SessionPayload {
   iat: number;
 }
 
+export interface SessionCookieProtocolRequest {
+  headers: {
+    get(name: string): string | null;
+  };
+  nextUrl: {
+    protocol: string;
+  };
+}
+
 export function resolveLoginMode({
   managedAccountCount,
   managedAuthEnabled,
@@ -54,6 +63,28 @@ export function resolveLoginMode({
   }
 
   return legacyAuthConfigured ? 'legacy_password' : 'none';
+}
+
+export function shouldUseSecureSessionCookie(request?: SessionCookieProtocolRequest): boolean {
+  if (process.env.NODE_ENV !== 'production') {
+    return false;
+  }
+
+  if (!request) {
+    return true;
+  }
+
+  const forwardedProtocol = request.headers
+    .get('x-forwarded-proto')
+    ?.split(',')[0]
+    ?.trim()
+    .toLowerCase();
+
+  if (forwardedProtocol) {
+    return forwardedProtocol === 'https';
+  }
+
+  return request.nextUrl.protocol === 'https:';
 }
 
 const PBKDF2_ITERATIONS = 120_000;

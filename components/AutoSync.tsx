@@ -8,10 +8,10 @@ import { useConfigSync } from '@/lib/hooks/useConfigSync';
 import { getSession } from '@/lib/store/auth-store';
 
 // 防抖函数，防止频繁请求
-function debounce(fn: Function, delay: number) {
-  let timeoutId: NodeJS.Timeout;
-  return (...args: any[]) => {
-    clearTimeout(timeoutId);
+function debounce<Args extends unknown[]>(fn: (...args: Args) => void, delay: number) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  return (...args: Args) => {
+    if (timeoutId) clearTimeout(timeoutId);
     timeoutId = setTimeout(() => fn(...args), delay);
   };
 }

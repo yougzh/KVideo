@@ -5,6 +5,7 @@ import {
   hashPassword,
   parseBootstrapAccounts,
   resolveLoginMode,
+  shouldUseSecureSessionCookie,
   signSessionPayload,
   verifyPassword,
   verifySessionToken,
@@ -14,6 +15,35 @@ import {
   hasRoleAtLeast,
   resolvePermissions,
 } from '@/lib/auth/permissions';
+
+function withNodeEnv<T>(value: string | undefined, callback: () => T): T {
+  const previous = process.env.NODE_ENV;
+
+  if (value === undefined) {
+    delete process.env.NODE_ENV;
+  } else {
+    process.env.NODE_ENV = value;
+  }
+
+  try {
+    return callback();
+  } finally {
+    if (previous === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = previous;
+    }
+  }
+}
+
+function mockCookieRequest(protocol: 'http:' | 'https:', forwardedProtocol?: string) {
+  return {
+    headers: new Headers(
+      forwardedProtocol ? { 'x-forwarded-proto': forwardedProtocol } : undefined,
+    ),
+    nextUrl: { protocol },
+  };
+}
 
 test('parseBootstrapAccounts supports legacy password:name entries', () => {
   const accounts = parseBootstrapAccounts('pass1:张三:admin,pass2:李四:viewer:iptv_access|danmaku_api');
@@ -102,4 +132,17 @@ test('resolvePermissions applies role defaults and IPTV management inheritance',
   assert.equal(hasResolvedPermission('admin', 'player_settings'), true);
   assert.equal(hasResolvedPermission('viewer', 'account_management'), false);
   assert.equal(hasRoleAtLeast('super_admin', 'admin'), true);
+});
+
+test('session cookies are secure only for HTTPS production requests', () => {
+  withNodeEnv('production', () => {
+    assert.equal(shouldUseSecureSessionCookie(mockCookieRequest('http:')), false);
+    assert.equal(shouldUseSecureSessionCookie(mockCookieRequest('https:')), true);
+    assert.equal(shouldUseSecureSessionCookie(mockCookieRequest('http:', 'https')), true);
+    assert.equal(shouldUseSecureSessionCookie(mockCookieRequest('https:', 'http')), false);
+  });
+
+  withNodeEnv('development', () => {
+    assert.equal(shouldUseSecureSessionCookie(mockCookieRequest('https:')), false);
+  });
 });

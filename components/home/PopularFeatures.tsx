@@ -9,7 +9,6 @@
 import { useState } from 'react';
 import { TagManager } from './TagManager';
 import { MovieGrid } from './MovieGrid';
-import { CategoryQuickSearch } from './CategoryQuickSearch';
 import { useTagManager } from './hooks/useTagManager';
 import { usePopularMovies } from './hooks/usePopularMovies';
 import { usePersonalizedRecommendations } from './hooks/usePersonalizedRecommendations';
@@ -58,6 +57,7 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
   const [isRecommendSelected, setIsRecommendSelected] = useState(false);
 
   const effectiveRecommendSelected = hasHistory && isRecommendSelected;
+  const isTagManagementMode = showTagManager;
 
   const {
     movies,
@@ -92,10 +92,8 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
 
   return (
     <div className="animate-fade-in">
-      <CategoryQuickSearch onSearch={onSearch} />
-
       {/* Content Type Toggle (Capsule Liquid Glass - Fixed & Centered) */}
-      {!effectiveRecommendSelected && (
+      {!isTagManagementMode && !effectiveRecommendSelected && (
         <div className="mb-10 flex justify-center">
           <div className="relative w-80 p-1 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-full grid grid-cols-2 backdrop-blur-2xl shadow-lg ring-1 ring-white/10 overflow-hidden">
             {/* Sliding Indicator */}
@@ -146,24 +144,26 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
         } : undefined}
       />
 
-      {effectiveRecommendSelected ? (
-        <MovieGrid
-          movies={recommendMovies}
-          loading={recommendLoading}
-          hasMore={recommendHasMore}
-          onMovieClick={handleMovieClick}
-          prefetchRef={recommendPrefetchRef}
-          loadMoreRef={recommendLoadMoreRef}
-        />
-      ) : (
-        <MovieGrid
-          movies={movies}
-          loading={loading}
-          hasMore={hasMore}
-          onMovieClick={handleMovieClick}
-          prefetchRef={prefetchRef}
-          loadMoreRef={loadMoreRef}
-        />
+      {!isTagManagementMode && (
+        effectiveRecommendSelected ? (
+          <MovieGrid
+            movies={recommendMovies}
+            loading={recommendLoading}
+            hasMore={recommendHasMore}
+            onMovieClick={handleMovieClick}
+            prefetchRef={recommendPrefetchRef}
+            loadMoreRef={recommendLoadMoreRef}
+          />
+        ) : (
+          <MovieGrid
+            movies={movies}
+            loading={loading}
+            hasMore={hasMore}
+            onMovieClick={handleMovieClick}
+            prefetchRef={prefetchRef}
+            loadMoreRef={loadMoreRef}
+          />
+        )
       )}
     </div>
   );

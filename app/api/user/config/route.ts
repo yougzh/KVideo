@@ -7,6 +7,7 @@
 
 import { Redis } from '@upstash/redis';
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticationRequiredResponse } from '@/lib/server/api-responses';
 import { getServerSession } from '@/lib/server/auth';
 
 export const runtime = 'edge';
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest) {
   const profileId = session?.profileId;
 
   if (!profileId) {
-    return NextResponse.json({ error: 'Missing profileId' }, { status: 400 });
+    return authenticationRequiredResponse();
   }
 
   try {
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
   const profileId = session?.profileId;
 
   if (!profileId) {
-    return NextResponse.json({ error: 'Missing profileId' }, { status: 400 });
+    return authenticationRequiredResponse();
   }
 
   try {

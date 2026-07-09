@@ -16,6 +16,7 @@ import { ScrollPositionManager } from "@/components/ScrollPositionManager";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import { RuntimeFeaturesProvider } from "@/components/RuntimeFeaturesProvider";
 import { VideoTogetherController } from '@/components/VideoTogetherController';
+import { shouldEnableVercelAnalytics } from '@/lib/config/deployment';
 import { getRuntimeFeatures } from "@/lib/server/runtime-features";
 import { resolveSiteIconSrc } from '@/lib/server/site-icon';
 import fs from 'fs';
@@ -86,6 +87,7 @@ export default async function RootLayout({
     process.env.VIDEOTOGETHER_SCRIPT_URL?.trim() || DEFAULT_VIDEOTOGETHER_SCRIPT_URL;
   const videoTogetherSettingUrl = process.env.VIDEOTOGETHER_SETTING_URL?.trim();
   const videoTogetherEnvEnabled = process.env.VIDEOTOGETHER_ENABLED !== 'false';
+  const vercelAnalyticsEnabled = shouldEnableVercelAnalytics();
 
   return (
     <html lang="zh-CN" suppressHydrationWarning>
@@ -114,8 +116,6 @@ export default async function RootLayout({
                 scriptUrl={videoTogetherScriptUrl}
                 settingUrl={videoTogetherSettingUrl}
               />
-              {/* 加入自动同步组件，它会在后台默默工作，我们放在 ThemeProvider 内部的最前面 */}
-              <AutoSync />
               <LocaleProvider />
 
               <TVProvider>
@@ -130,13 +130,14 @@ export default async function RootLayout({
                     process.env.UPSTASH_REDIS_REST_TOKEN
                   )
                 )}>
+                  <AutoSync />
                   <AdKeywordsWrapper />
                   {children}
                   <BackToTop />
                   <ScrollPositionManager />
                 </PasswordGate>
               </TVProvider>
-              <Analytics />
+              {vercelAnalyticsEnabled ? <Analytics /> : null}
               <ServiceWorkerRegister />
             </RuntimeFeaturesProvider>
           </ThemeProvider>

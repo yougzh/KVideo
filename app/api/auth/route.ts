@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ valid: false });
     }
 
-    return createLoginResponse(session);
+    return createLoginResponse(session, request);
   } catch {
     return NextResponse.json({ valid: false, message: 'Invalid request' }, { status: 400 });
   }

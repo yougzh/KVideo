@@ -4,8 +4,79 @@
     "name": "KVideo",
     "branch": "main"
   },
-  "currentVersion": "4.9.4",
+  "currentVersion": "4.9.11",
   "releases": [
+    {
+      "version": "4.9.11",
+      "publishedAt": "2026-07-09",
+      "title": "修复登录成功后回到登录页",
+      "notes": [
+        "访问密码 gate 登录成功后会直接放行当前页面，不再依赖整页刷新进入主界面，避免会话镜像时序导致重复登录。",
+        "服务端 session cookie 的 Secure 属性现在按实际请求协议和 x-forwarded-proto 判断，修复 Docker / HTTP 自托管生产模式下浏览器拒收 cookie 后刷新又回登录页的问题。",
+        "新增登录 gate 状态决策和 session cookie 协议判断回归测试。"
+      ]
+    },
+    {
+      "version": "4.9.10",
+      "publishedAt": "2026-07-09",
+      "title": "移除首页顶部快捷搜索区",
+      "notes": [
+        "首页不再显示内容分类、电影类型、年份三组硬编码快捷搜索按钮。",
+        "推荐页顶部直接进入内容类型切换与后端标签列表，减少标签区域上方的无关占用。",
+        "更新标签管理视图回归测试，防止首页重新引用 CategoryQuickSearch。"
+      ]
+    },
+    {
+      "version": "4.9.9",
+      "publishedAt": "2026-07-09",
+      "title": "修复管理标签入口误入搜索流程",
+      "notes": [
+        "首页管理标签模式现在会隐藏内容分类、电影类型、年份等快捷搜索项，避免用户打开标签管理时触发视频源搜索。",
+        "管理标签时不再显示电影/电视剧切换和推荐内容网格，完成、恢复默认、添加标签和标签列表成为当前视图主体。",
+        "标签 chip 在管理模式下改为可换行布局，并使用矩形拖拽排序策略，减少上方筛选内容对标签操作区的挤压。",
+        "新增标签管理视图回归测试，锁定管理入口不应退化为搜索结果筛选界面。"
+      ]
+    },
+    {
+      "version": "4.9.8",
+      "publishedAt": "2026-07-09",
+      "title": "修复登录后同步接口 400",
+      "notes": [
+        "自动同步组件现在只会在访问密码 gate 确认服务端会话并完成本地 session 镜像后挂载，避免登录跳转阶段提前请求 /api/user/config 与 /api/user/sync。",
+        "用户配置和云同步 API 在没有有效服务端 session 时改为返回 401 Authentication required，不再把未认证状态伪装成 Missing profileId 的 400。",
+        "新增未认证响应回归测试，防止受保护同步接口的状态码语义再次退化。"
+      ]
+    },
+    {
+      "version": "4.9.7",
+      "publishedAt": "2026-07-09",
+      "title": "修复旧 Android WebView 白屏",
+      "notes": [
+        "Next.js 构建后的浏览器静态 JS 现在会额外转译到 Chrome/WebView 83 目标，避免小米电视等旧 Android System WebView 因不支持 ??=、||=、&&= 而白屏。",
+        "Cloudflare Pages 构建链路同样会处理输出目录，确保托管站点和 Docker/Node 自托管站点使用一致的旧 WebView 兼容产物。",
+        "新增 WebView 83 静态资源回归测试，防止逻辑赋值语法重新漏进浏览器构建产物。"
+      ]
+    },
+    {
+      "version": "4.9.6",
+      "publishedAt": "2026-07-09",
+      "title": "修复移动端横屏弹幕缩放",
+      "notes": [
+        "弹幕画布现在优先使用未受 CSS transform 影响的布局尺寸，避免 iOS Safari 网页横屏时字体被拉伸或压缩。",
+        "横竖屏和 visualViewport 尺寸变化后会重新同步画布 backing store，并按新尺寸重排活跃弹幕。",
+        "新增弹幕画布尺寸工具测试，覆盖 transform 后 bounding box 横竖互换的回归场景。"
+      ]
+    },
+    {
+      "version": "4.9.5",
+      "publishedAt": "2026-07-09",
+      "title": "修复 Docker 登录页 Analytics 404",
+      "notes": [
+        "Vercel Analytics 现在只会在真实 Vercel 部署中注入，Docker、自托管和 Cloudflare Pages 不再请求 /_vercel/insights/script.js。",
+        "Cloudflare 部署环境判定优先于 Vercel 风格环境变量，避免适配器环境被误判为 Vercel。",
+        "新增部署环境单元测试，覆盖自托管、Vercel、Cloudflare 和混合环境变量场景。"
+      ]
+    },
     {
       "version": "4.9.4",
       "publishedAt": "2026-07-08",

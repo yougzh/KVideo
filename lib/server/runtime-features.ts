@@ -1,20 +1,7 @@
 import 'server-only';
 
 import type { RuntimeFeatures } from '@/lib/config/runtime-features';
-
-function isVercelDeployment(): boolean {
-  return process.env.VERCEL === '1' || Boolean(process.env.VERCEL_ENV);
-}
-
-function isCloudflareDeployment(): boolean {
-  return (
-    process.env.CF_PAGES === '1' ||
-    Boolean(process.env.CF_PAGES_URL) ||
-    Boolean(process.env.CLOUDFLARE_ACCOUNT_ID) ||
-    Boolean(process.env.CF_ACCOUNT_ID) ||
-    Boolean(process.env.WORKERS_CI)
-  );
-}
+import { isCloudflareDeployment, isVercelDeployment } from '@/lib/config/deployment';
 
 function getRestrictedFeatures(
   deploymentProvider: RuntimeFeatures['deploymentProvider'],
@@ -31,12 +18,12 @@ function getRestrictedFeatures(
 }
 
 export function getRuntimeFeatures(): RuntimeFeatures {
-  if (isVercelDeployment()) {
-    return getRestrictedFeatures('vercel', 'Vercel');
-  }
-
   if (isCloudflareDeployment()) {
     return getRestrictedFeatures('cloudflare', 'Cloudflare');
+  }
+
+  if (isVercelDeployment()) {
+    return getRestrictedFeatures('vercel', 'Vercel');
   }
 
   return {
@@ -48,4 +35,3 @@ export function getRuntimeFeatures(): RuntimeFeatures {
     restrictionSummary: null,
   };
 }
-

@@ -8,11 +8,13 @@ import {
   normalizeUsername,
   parseBootstrapAccounts,
   resolveLoginMode,
+  shouldUseSecureSessionCookie,
   signSessionPayload,
   verifyPassword,
   verifySessionToken,
   type LoginMode,
   type SeedAccountInput,
+  type SessionCookieProtocolRequest,
   type SessionPayload,
   type StoredAccountRecord,
 } from '@/lib/server/auth-helpers';
@@ -319,27 +321,6 @@ export async function getServerSession(request: NextRequest): Promise<ServerAuth
   return sessionPayloadToServerSession(payload);
 }
 
-function applySessionCookie(response: NextResponse, token: string, persist: boolean): void {
-  response.cookies.set(SESSION_COOKIE_NAME, token, {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    ...(persist ? { maxAge: SESSION_MAX_AGE_SECONDS } : {}),
-  });
-}
-
-export function clearSessionCookie(response: NextResponse): NextResponse {
-  response.cookies.set(SESSION_COOKIE_NAME, '', {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    path: '/',
-    maxAge: 0,
-  });
-  return response;
-}
-
 export function hasServerPermission(session: ServerAuthSession, permission: Permission): boolean {
   return hasResolvedPermission(session.role, permission, session.customPermissions);
 }
@@ -457,7 +438,10 @@ export async function validatePremiumAccess(
   return authenticateLegacyAdminCredential(body.password);
 }
 
-export async function createLoginResponse(session: ServerAuthSession): Promise<NextResponse> {
+export async function createLoginResponse(
+  session: ServerAuthSession,
+  request?: SessionCookieProtocolRequest,
+): Promise<NextResponse> {
   const config = await getPublicAuthConfig();
   const token = await signSession(session, config.loginMode);
   if (!token) {
@@ -470,7 +454,13 @@ export async function createLoginResponse(session: ServerAuthSession): Promise<N
     ...config,
   });
 
-  applySessionCookie(response, token, PERSIST_SESSION);
+  response.cookies.set(SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: shouldUseSecureSessionCookie(request),
+    path: '/',
+    ...(PERSIST_SESSION ? { maxAge: SESSION_MAX_AGE_SECONDS } : {}),
+  });
   return response;
 }
 
@@ -485,8 +475,16 @@ export async function createSessionStatusResponse(request: NextRequest): Promise
   });
 }
 
-export function logoutResponse(): NextResponse {
-  return clearSessionCookie(NextResponse.json({ success: true }));
+export function logoutResponse(request?: SessionCookieProtocolRequest): NextResponse {
+  const response = NextResponse.json({ success: true });
+  response.cookies.set(SESSION_COOKIE_NAME, '', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: shouldUseSecureSessionCookie(request),
+    path: '/',
+    maxAge: 0,
+  });
+  return response;
 }
 
 export async function listAccountInfo(): Promise<AccountInfo[]> {

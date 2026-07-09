@@ -765,7 +765,7 @@ ALLOW_LAN_ACCESS=true LAN_ALLOWED_DEV_ORIGINS="kvideo.lan,192.168.50.10" npm run
 
 - **ESLint 10**：代码质量检查
 - **PostCSS 8**：CSS 处理器
-- **Vercel Analytics**：性能监控和分析
+- **Vercel Analytics**：仅在 Vercel 部署中启用的性能监控和分析
 - **Cloudflare Pages**：边缘部署支持
 
 ### 架构特点
