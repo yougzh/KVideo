@@ -6,6 +6,7 @@ import { PremiumSourceSettings } from '@/components/settings/PremiumSourceSettin
 import { DisplaySettings } from '@/components/settings/DisplaySettings';
 import { PlayerSettings } from '@/components/settings/PlayerSettings';
 import { AppVersionSettings } from '@/components/settings/AppVersionSettings';
+import { AccountSettings } from '@/components/settings/AccountSettings';
 import { AdminGate } from '@/components/AdminGate';
 import { usePremiumSettingsPage } from './hooks/usePremiumSettingsPage';
 import Link from 'next/link';
@@ -77,6 +78,9 @@ export default function PremiumSettingsPage() {
                 </div>
 
                 <AppVersionSettings />
+
+                {/* Account management and logout must remain available in premium mode. */}
+                <AccountSettings />
 
                 {/* Player Settings */}
                 <PlayerSettings

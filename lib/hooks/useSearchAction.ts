@@ -1,14 +1,13 @@
 import { useRef, useCallback } from 'react';
-import { SOURCE_IDS } from '@/lib/utils/source-names';
 import { sortVideos } from '@/lib/utils/sort';
 import { binaryInsertVideos } from '@/lib/utils/sorted-insert';
 import { processSearchStream } from '@/lib/utils/search-stream';
 import type { SortOption } from '@/lib/store/settings-store';
 import { settingsStore } from '@/lib/store/settings-store';
-import type { Video } from '@/lib/types';
 import { useSearchState } from './useSearchState';
 
 type SearchState = ReturnType<typeof useSearchState>;
+type SearchSourceConfig = { id: string; baseUrl?: string };
 
 interface UseSearchActionProps {
     state: SearchState;
@@ -77,7 +76,10 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
             const reader = response.body?.getReader();
             if (!reader) throw new Error('No response stream');
 
-            const sourcesMap = new Map<string, { count: number; name: string }>();
+            const sourceConfigs = new Map<string, SearchSourceConfig>(
+                targetSources.map((source: SearchSourceConfig) => [source.id, source])
+            );
+            const sourcesMap = new Map<string, { count: number; name: string; baseUrl?: string }>();
 
             await processSearchStream({
                 reader,
@@ -95,6 +97,7 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
                         sourcesMap.set(sourceId, {
                             count: newVideos.length,
                             name: newVideos[0]?.sourceName || sourceId,
+                            baseUrl: sourceConfigs.get(sourceId)?.baseUrl,
                         });
                     }
                 },
@@ -113,6 +116,7 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
                         id: id,
                         name: info.name,
                         count: info.count,
+                        ...(info.baseUrl ? { baseUrl: info.baseUrl } : {}),
                     }));
                     setAvailableSources(sources);
 

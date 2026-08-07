@@ -82,8 +82,8 @@ export function Navbar({ onReset, isPremiumMode = false }: NavbarProps) {
 
                             {/* User Info */}
                             {session && (
-                                <div className="hidden sm:flex items-center gap-2">
-                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-full)] text-xs">
+                                <div className="flex items-center gap-1 sm:gap-2">
+                                    <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-full)] text-xs">
                                         <div className="w-5 h-5 rounded-[var(--radius-full)] bg-[var(--accent-color)]/10 flex items-center justify-center text-[var(--accent-color)] font-bold text-[10px] border border-[var(--glass-border)]">
                                             {session.name.charAt(0)}
                                         </div>

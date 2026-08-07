@@ -26,7 +26,9 @@ function HomePage() {
 
   // Real-time latency pinging
   const sourceUrls = useMemo(() =>
-    availableSources.map(s => ({ id: s.id, baseUrl: s.id })), // Using id as baseUrl if not available elsewhere
+    availableSources.flatMap((source) =>
+      source.baseUrl ? [{ id: source.id, baseUrl: source.baseUrl }] : []
+    ),
     [availableSources]
   );
 

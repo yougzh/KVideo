@@ -24,12 +24,12 @@ export async function fetchWithTimeout(
 
     // If an external signal is provided, propagate its abort
     const externalSignal = options.signal;
+    let onAbort: (() => void) | undefined;
     if (externalSignal) {
         if (externalSignal.aborted) {
-            clearTimeout(timeoutId);
             controller.abort();
         } else {
-            const onAbort = () => controller.abort();
+            onAbort = () => controller.abort();
             externalSignal.addEventListener('abort', onAbort, { once: true });
         }
     }
@@ -39,11 +39,12 @@ export async function fetchWithTimeout(
             ...options,
             signal: controller.signal,
         });
-        clearTimeout(timeoutId);
         return response;
-    } catch (error) {
+    } finally {
         clearTimeout(timeoutId);
-        throw error;
+        if (externalSignal && onAbort) {
+            externalSignal.removeEventListener('abort', onAbort);
+        }
     }
 }
 
@@ -61,6 +62,10 @@ export async function withRetry<T>(
             return await fn();
         } catch (error) {
             lastError = error as Error;
+
+            if (lastError?.name === 'AbortError') {
+                throw lastError;
+            }
 
             if (i < retries) {
                 await new Promise(resolve => setTimeout(resolve, RETRY_DELAY * (i + 1)));
