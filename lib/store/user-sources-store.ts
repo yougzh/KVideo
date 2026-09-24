@@ -5,6 +5,7 @@
 
 import { getProfileId } from './auth-store';
 import type { VideoSource } from '@/lib/types';
+import { isVideoSourceEnabled } from '@/lib/utils/video-source';
 
 export interface DanmakuApiEntry {
   id: string;
@@ -91,7 +92,7 @@ export const userSourcesStore = {
     saveState({
       ...state,
       sources: state.sources.map(s =>
-        s.id === id ? { ...s, enabled: !s.enabled } : s
+        s.id === id ? { ...s, enabled: !isVideoSourceEnabled(s) } : s
       ),
     });
   },

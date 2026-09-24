@@ -3,6 +3,7 @@
  * Matches HistoryItem layout for consistency
  */
 
+import { useRouter } from 'next/navigation';
 import { Icons } from '@/components/ui/Icon';
 import { formatDate } from '@/lib/utils/format-utils';
 import { getSourceName } from '@/lib/utils/source-names';
@@ -16,6 +17,8 @@ interface FavoritesItemProps {
 }
 
 export function FavoritesItem({ item, onRemove, isPremium = false }: FavoritesItemProps) {
+    const router = useRouter();
+
     const getVideoUrl = (): string => {
         const params = new URLSearchParams({
             id: item.videoId.toString(),
@@ -40,7 +43,7 @@ export function FavoritesItem({ item, onRemove, isPremium = false }: FavoritesIt
         return `/player?${params.toString()}`;
     };
 
-    const handleClick = (event: React.MouseEvent) => {
+    const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
         // Middle mouse or Ctrl/Cmd+click opens in new tab
         if (event.button === 1 || event.ctrlKey || event.metaKey) {
             event.preventDefault();
@@ -49,18 +52,21 @@ export function FavoritesItem({ item, onRemove, isPremium = false }: FavoritesIt
         }
     };
 
+    const navigateToVideo = (event: React.MouseEvent) => {
+        if (event.button === 1 || event.ctrlKey || event.metaKey) return;
+        event.preventDefault();
+        router.push(getVideoUrl());
+    };
+
     return (
         <div className="group bg-[color-mix(in_srgb,var(--glass-bg)_50%,transparent)] rounded-[var(--radius-2xl)] p-3 hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all border border-transparent hover:border-[var(--glass-border)]">
             <a
                 href={getVideoUrl()}
                 onClick={(e) => {
-                    e.preventDefault();
-                    handleClick(e as any);
-                    if (!e.ctrlKey && !e.metaKey) {
-                        window.location.href = getVideoUrl();
-                    }
+                    navigateToVideo(e);
+                    handleClick(e);
                 }}
-                onAuxClick={(e) => handleClick(e as any)}
+                onAuxClick={handleClick}
                 className="block"
             >
                 <div className="flex gap-3">

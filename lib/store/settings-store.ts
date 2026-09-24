@@ -6,6 +6,7 @@ import type { VideoSource, SourceSubscription } from '@/lib/types';
 import { DEFAULT_SOURCES } from '@/lib/api/default-sources';
 import { PREMIUM_SOURCES } from '@/lib/api/premium-sources';
 import { createSubscription } from '@/lib/utils/source-import-utils';
+import { normalizeVideoSource } from '@/lib/utils/video-source';
 
 export type LocaleOption = 'zh-CN' | 'zh-TW';
 
@@ -216,12 +217,14 @@ export const settingsStore = {
         }
       });
 
-      // Filter out invalid sources (missing baseUrl etc)
+      // Filter out invalid sources and normalize legacy sources that omitted `enabled`.
       const validSources = (Array.isArray(parsed.sources) ? parsed.sources : getDefaultSources())
-        .filter((s: any) => s && s.id && s.name && s.baseUrl);
+        .map(normalizeVideoSource)
+        .filter((source: VideoSource | null): source is VideoSource => source !== null);
 
       const validPremiumSources = (Array.isArray(parsed.premiumSources) ? parsed.premiumSources : getDefaultPremiumSources())
-        .filter((s: any) => s && s.id && s.name && s.baseUrl);
+        .map(normalizeVideoSource)
+        .filter((source: VideoSource | null): source is VideoSource => source !== null);
 
       // Validate that parsed data has all required properties
       return {

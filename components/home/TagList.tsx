@@ -14,12 +14,13 @@ import {
 import {
     SortableContext,
     sortableKeyboardCoordinates,
-    horizontalListSortingStrategy,
     rectSortingStrategy,
 } from '@dnd-kit/sortable';
 import { SortableTag, Tag } from './SortableTag';
-import { useState, useRef, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Icons } from '@/components/ui/Icon';
+
+const VISIBLE_TAG_LIMIT = 24;
 
 interface RecommendTagConfig {
     label: string;
@@ -50,7 +51,8 @@ export function TagList({
     onJustAddedTagHandled,
     recommendTag,
 }: TagListProps) {
-    const scrollContainerRef = useRef<HTMLDivElement>(null);
+    const [tagFilter, setTagFilter] = useState('');
+    const [showAllTags, setShowAllTags] = useState(false);
     const [activeId, setActiveId] = useState<string | null>(null);
 
     const sensors = useSensors(
@@ -64,37 +66,21 @@ export function TagList({
         })
     );
 
-    // Auto-scroll to end when new tag is added
+    const normalizedFilter = tagFilter.trim().toLowerCase();
+    const filteredTags = useMemo(
+        () => tags.filter(tag => tag.label.toLowerCase().includes(normalizedFilter)),
+        [normalizedFilter, tags]
+    );
+    const visibleTags = useMemo(
+        () => ((showAllTags || justAddedTag) ? filteredTags : filteredTags.slice(0, VISIBLE_TAG_LIMIT)),
+        [filteredTags, justAddedTag, showAllTags]
+    );
+    const canToggleAllTags = filteredTags.length > VISIBLE_TAG_LIMIT;
+
     useEffect(() => {
-        if (justAddedTag && scrollContainerRef.current) {
-            scrollContainerRef.current.scrollTo({
-                left: scrollContainerRef.current.scrollWidth,
-                behavior: 'smooth',
-            });
-            onJustAddedTagHandled();
-        }
+        if (!justAddedTag) return;
+        onJustAddedTagHandled();
     }, [justAddedTag, onJustAddedTagHandled]);
-
-    // Handle horizontal scroll with mouse wheel
-    useEffect(() => {
-        const container = scrollContainerRef.current;
-        if (!container) return;
-
-        const handleWheel = (e: WheelEvent) => {
-            // Check if it's a vertical scroll (mostly deltaY) and negligible horizontal scroll
-            if (e.deltaY !== 0 && Math.abs(e.deltaX) < Math.abs(e.deltaY)) {
-                e.preventDefault();
-                container.scrollLeft += e.deltaY;
-            }
-        };
-
-        // Add passive: false to allow preventDefault
-        container.addEventListener('wheel', handleWheel, { passive: false });
-
-        return () => {
-            container.removeEventListener('wheel', handleWheel);
-        };
-    }, []);
 
     const handleDragStart = (event: DragStartEvent) => {
         setActiveId(event.active.id as string);
@@ -114,14 +100,7 @@ export function TagList({
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
         >
-            <div
-                ref={scrollContainerRef}
-                className={`mb-8 flex items-center gap-3 pb-3 pt-2 px-1 scrollbar-hide ${
-                    showTagManager
-                        ? 'flex-wrap overflow-visible'
-                        : 'overflow-x-auto'
-                }`}
-            >
+            <div className="mb-8 flex flex-wrap items-center gap-3 pt-2 px-1">
                 {/* Recommendation Tag — non-draggable, rendered before sortable tags */}
                 {recommendTag && (
                     <div className="relative flex-shrink-0">
@@ -141,21 +120,57 @@ export function TagList({
                         </button>
                     </div>
                 )}
-                <SortableContext
-                    items={tags.map((t) => t.id)}
-                    strategy={showTagManager ? rectSortingStrategy : horizontalListSortingStrategy}
-                >
-                    {tags.map((tag) => (
-                        <SortableTag
-                            key={tag.id}
-                            tag={tag}
-                            selectedTag={selectedTag}
-                            showTagManager={showTagManager}
-                            onTagSelect={onTagSelect}
-                            onTagDelete={onTagDelete}
+                {tags.length > 12 && (
+                    <div className="relative w-full sm:w-64">
+                        <Icons.Search
+                            size={16}
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-color-secondary)] pointer-events-none"
                         />
-                    ))}
-                </SortableContext>
+                        <input
+                            type="search"
+                            value={tagFilter}
+                            onChange={(event) => setTagFilter(event.target.value)}
+                            placeholder="搜索标签"
+                            aria-label="搜索标签"
+                            className="w-full h-10 pl-9 pr-3 text-sm bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-full)] text-[var(--text-color)] placeholder:text-[var(--text-color-secondary)] outline-none focus:border-[var(--accent-color)]"
+                        />
+                    </div>
+                )}
+
+                {filteredTags.length === 0 ? (
+                    <p className="w-full py-3 text-sm text-[var(--text-color-secondary)]">
+                        没有匹配的标签
+                    </p>
+                ) : (
+                    <>
+                        <SortableContext
+                            items={visibleTags.map((t) => t.id)}
+                            strategy={rectSortingStrategy}
+                        >
+                            {visibleTags.map((tag) => (
+                                <SortableTag
+                                    key={tag.id}
+                                    tag={tag}
+                                    selectedTag={selectedTag}
+                                    showTagManager={showTagManager}
+                                    onTagSelect={onTagSelect}
+                                    onTagDelete={onTagDelete}
+                                />
+                            ))}
+                        </SortableContext>
+
+                        {canToggleAllTags && (
+                            <button
+                                type="button"
+                                onClick={() => setShowAllTags((current) => !current)}
+                                aria-expanded={showAllTags || justAddedTag}
+                                className="px-4 py-2.5 text-sm font-semibold text-[var(--accent-color)] border border-[var(--glass-border)] rounded-[var(--radius-full)] hover:border-[var(--accent-color)] transition-colors"
+                            >
+                                {(showAllTags || justAddedTag) ? '收起标签' : `显示全部 (${filteredTags.length})`}
+                            </button>
+                        )}
+                    </>
+                )}
             </div>
 
             <DragOverlay>

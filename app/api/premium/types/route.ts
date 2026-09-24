@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PREMIUM_SOURCES } from '@/lib/api/premium-sources';
+import { isVideoSourceEnabled } from '@/lib/utils/video-source';
 
 export const runtime = 'edge';
 
@@ -17,9 +18,9 @@ interface SourceCategories {
 }
 
 // Shared handler
-async function handleTypesRequest(sourceList: any[]) {
+async function handleTypesRequest(sourceList: any[], cacheable = false) {
     try {
-        const enabledSources = sourceList.filter(s => s.enabled);
+        const enabledSources = sourceList.filter(isVideoSourceEnabled);
 
         const results = await Promise.allSettled(
             enabledSources.map(async (source: any) => {
@@ -150,7 +151,17 @@ async function handleTypesRequest(sourceList: any[]) {
             });
         });
 
-        return NextResponse.json({ tags: allTags });
+        return NextResponse.json({ tags: allTags }, {
+            headers: cacheable
+                ? {
+                    'Cache-Control': 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400',
+                    'CDN-Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+                    'Cloudflare-CDN-Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+                }
+                : {
+                    'Cache-Control': 'private, max-age=300',
+                },
+        });
     } catch (error) {
         console.error('Failed to aggregate categories:', error);
         return NextResponse.json(
@@ -171,5 +182,5 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-    return await handleTypesRequest(PREMIUM_SOURCES);
+    return await handleTypesRequest(PREMIUM_SOURCES, true);
 }

@@ -90,13 +90,14 @@ export function SearchResults({
             )}
 
             {/* Display filtered videos (source, type, and language filters applied) */}
-            <VideoGrid
-                videos={finalFilteredVideos}
-                isPremium={isPremium}
-                latencies={latencies}
-            />
+            {finalFilteredVideos.length > 0 && (
+                <VideoGrid
+                    videos={finalFilteredVideos}
+                    isPremium={isPremium}
+                    latencies={latencies}
+                />
+            )}
         </div>
     );
 }
-
 

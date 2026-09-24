@@ -1,10 +1,12 @@
 'use client';
 
 import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { SearchForm } from '@/components/search/SearchForm';
 import { NoResults } from '@/components/search/NoResults';
 import { Navbar } from '@/components/layout/Navbar';
 import { SearchResults } from '@/components/home/SearchResults';
+import { SourceSetupEmptyState } from '@/components/home/SourceSetupEmptyState';
 import { usePremiumHomePage } from '@/lib/hooks/usePremiumHomePage';
 import { PremiumContent } from '@/components/premium/PremiumContent';
 import { FavoritesSidebar } from '@/components/favorites/FavoritesSidebar';
@@ -14,6 +16,7 @@ function PremiumHomePage() {
     const {
         query,
         hasSearched,
+        sourceState,
         loading,
         results,
         availableSources,
@@ -60,13 +63,18 @@ function PremiumHomePage() {
                     />
                 )}
 
+                {/* No configured sources */}
+                {!loading && sourceState === 'empty' && (
+                    <SourceSetupEmptyState isPremium={true} />
+                )}
+
                 {/* No Results */}
-                {!loading && hasSearched && results.length === 0 && (
+                {!loading && hasSearched && sourceState === 'ready' && results.length === 0 && (
                     <NoResults onReset={handleReset} />
                 )}
 
                 {/* Premium Content - Trending and Latest */}
-                {!loading && !hasSearched && (
+                {!loading && !hasSearched && sourceState === 'ready' && (
                     <>
                         <PremiumContent onSearch={handleSearch} />
                     </>
@@ -87,8 +95,15 @@ export default function PremiumPage() {
             </div>
         }>
             <PremiumPasswordGate>
-                <PremiumHomePage />
+                <PremiumHomePageWithQuery />
             </PremiumPasswordGate>
         </Suspense>
     );
+}
+
+function PremiumHomePageWithQuery() {
+    const searchParams = useSearchParams();
+    const query = searchParams.get('q')?.trim() || '';
+
+    return <PremiumHomePage key={query} />;
 }

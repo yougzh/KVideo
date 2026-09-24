@@ -1,12 +1,14 @@
 'use client';
 
 import { Suspense, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { SearchForm } from '@/components/search/SearchForm';
 import { NoResults } from '@/components/search/NoResults';
 import { PopularFeatures } from '@/components/home/PopularFeatures';
 import { FavoritesSidebar } from '@/components/favorites/FavoritesSidebar';
 import { Navbar } from '@/components/layout/Navbar';
 import { SearchResults } from '@/components/home/SearchResults';
+import { SourceSetupEmptyState } from '@/components/home/SourceSetupEmptyState';
 import { useHomePage } from '@/lib/hooks/useHomePage';
 import { useLatencyPing } from '@/lib/hooks/useLatencyPing';
 
@@ -14,6 +16,7 @@ function HomePage() {
   const {
     query,
     hasSearched,
+    sourceState,
     loading,
     results,
     availableSources,
@@ -72,14 +75,19 @@ function HomePage() {
         )}
 
         {/* Popular Features - Homepage */}
-        {!loading && !hasSearched && (
+        {!loading && !hasSearched && sourceState === 'ready' && (
           <>
             <PopularFeatures onSearch={handleSearch} />
           </>
         )}
 
+        {/* No configured sources */}
+        {!loading && sourceState === 'empty' && (
+          <SourceSetupEmptyState />
+        )}
+
         {/* No Results */}
-        {!loading && hasSearched && results.length === 0 && (
+        {!loading && hasSearched && sourceState === 'ready' && results.length === 0 && (
           <NoResults onReset={handleReset} />
         )}
       </main>
@@ -97,7 +105,14 @@ export default function Home() {
         <div className="animate-spin rounded-full h-16 w-16 border-4 border-[var(--accent-color)] border-t-transparent"></div>
       </div>
     }>
-      <HomePage />
+      <HomePageWithQuery />
     </Suspense>
   );
+}
+
+function HomePageWithQuery() {
+  const searchParams = useSearchParams();
+  const query = searchParams.get('q')?.trim() || '';
+
+  return <HomePage key={query} />;
 }

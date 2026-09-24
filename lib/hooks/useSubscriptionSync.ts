@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { settingsStore } from '@/lib/store/settings-store';
 import { fetchSourcesFromUrl, mergeSources } from '@/lib/utils/source-import-utils';
 import type { SourceSubscription } from '@/lib/types';
@@ -9,6 +9,7 @@ const SYNC_COOLDOWN_MS = 5 * 60 * 1000;
 const INITIAL_SYNC_DELAY_MS = 1000;
 
 export function useSubscriptionSync() {
+    const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'done'>('idle');
     // Track if we've already synced during this component lifecycle
     const hasSyncedRef = useRef(false);
     // Track if sync is currently in progress to avoid concurrent syncs
@@ -32,13 +33,16 @@ export function useSubscriptionSync() {
 
                 if (activeSubscriptions.length === 0) {
                     hasSyncedRef.current = true;
+                    setSyncState('done');
                     return;
                 }
+
+                setSyncState('syncing');
 
                 let anyChanged = false;
                 let currentSources = [...settings.sources];
                 let currentPremiumSources = [...settings.premiumSources];
-                let updatedSubscriptions = [...settings.subscriptions];
+                const updatedSubscriptions = [...settings.subscriptions];
                 const now = Date.now();
 
                 // Filter out subscriptions that were synced recently (within cooldown period)
@@ -48,6 +52,7 @@ export function useSubscriptionSync() {
 
                 if (subsToSync.length === 0) {
                     hasSyncedRef.current = true;
+                    setSyncState('done');
                     return;
                 }
 
@@ -95,9 +100,10 @@ export function useSubscriptionSync() {
                     });
                 }
 
-                hasSyncedRef.current = true;
             } finally {
+                hasSyncedRef.current = true;
                 isSyncingRef.current = false;
+                setSyncState('done');
             }
         };
 
@@ -105,4 +111,6 @@ export function useSubscriptionSync() {
         const timeoutId = setTimeout(sync, INITIAL_SYNC_DELAY_MS);
         return () => clearTimeout(timeoutId);
     }, []); // Empty dependency array - only run once on mount
+
+    return { syncState };
 }

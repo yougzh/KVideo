@@ -5,9 +5,10 @@ import { useParallelSearch } from '@/lib/hooks/useParallelSearch';
 import { useSubscriptionSync } from '@/lib/hooks/useSubscriptionSync';
 import { settingsStore, type SortOption } from '@/lib/store/settings-store';
 import { userSourcesStore } from '@/lib/store/user-sources-store';
+import { isVideoSourceEnabled } from '@/lib/utils/video-source';
 
 export function useHomePage() {
-    useSubscriptionSync();
+    const { syncState } = useSubscriptionSync();
     const router = useRouter();
     const searchParams = useSearchParams();
     const { loadFromCache, saveToCache } = useSearchCache();
@@ -15,13 +16,34 @@ export function useHomePage() {
     const hasSearchedWithSourcesRef = useRef(false);
     const isInitialCacheLoad = useRef(false);
 
-    const [query, setQuery] = useState('');
-    const [hasSearched, setHasSearched] = useState(false);
+    const urlQuery = searchParams.get('q')?.trim() || '';
+    const query = urlQuery;
+    const hasSearched = urlQuery.length > 0;
     const [currentSortBy, setCurrentSortBy] = useState<SortOption>('default');
+    const [sourceState, setSourceState] = useState<'loading' | 'ready' | 'empty'>('loading');
+
+    const getConfiguredSources = useCallback(() => {
+        const settings = settingsStore.getSettings();
+        const allSources = [
+            ...settings.sources.filter(isVideoSourceEnabled),
+            ...userSourcesStore.getSources().filter(isVideoSourceEnabled),
+        ];
+        const uniqueSources = allSources.filter(
+            (source, index) => allSources.findIndex(candidate => candidate.id === source.id) === index
+        );
+
+        return {
+            sources: uniqueSources,
+            hasPendingSubscriptions: settings.subscriptions.some(
+                subscription => subscription.autoRefresh !== false
+            ),
+        };
+    }, []);
 
     const onUrlUpdate = useCallback((q: string) => {
-        router.replace(`/?q=${encodeURIComponent(q)}`, { scroll: false });
-    }, [router]);
+        if (q.trim() === urlQuery) return;
+        router.push(`/?q=${encodeURIComponent(q)}`, { scroll: false });
+    }, [router, urlQuery]);
 
     // Search stream hook
     const {
@@ -48,16 +70,7 @@ export function useHomePage() {
         if (!searchQuery.trim()) return false;
 
         const settings = settingsStore.getSettings();
-        const enabledSources = settings.sources.filter(s => s.enabled);
-
-        // Merge user personal sources
-        const userSources = userSourcesStore.getSources().filter(s => s.enabled !== false);
-        const allSources = [...enabledSources];
-        for (const us of userSources) {
-            if (!allSources.find(s => s.id === us.id)) {
-                allSources.push(us);
-            }
-        }
+        const { sources: allSources } = getConfiguredSources();
 
         if (allSources.length === 0) {
             return false;
@@ -66,7 +79,45 @@ export function useHomePage() {
         performSearch(searchQuery, allSources, settings.sortBy);
         hasSearchedWithSourcesRef.current = true;
         return true;
-    }, [performSearch]);
+    }, [getConfiguredSources, performSearch]);
+
+    const handleSearch = useCallback((searchQuery: string) => {
+        const normalizedQuery = searchQuery.trim();
+        if (!normalizedQuery) return;
+
+        // Clear scroll position for this search query to ensure we start at the top on a fresh search
+        const scrollKey = `scroll-pos:/?q=${encodeURIComponent(normalizedQuery)}`;
+        sessionStorage.removeItem(scrollKey);
+
+        // Reset cache load flag for new search
+        isInitialCacheLoad.current = false;
+
+        if (normalizedQuery !== urlQuery) {
+            router.push(`/?q=${encodeURIComponent(normalizedQuery)}`, { scroll: false });
+            return;
+        }
+
+        executeSearch(normalizedQuery);
+    }, [executeSearch, router, urlQuery]);
+
+    // Load cached results on mount. The page is keyed by URL query, so browser
+    // back/forward navigation re-runs this for the destination query.
+    useEffect(() => {
+        if (hasLoadedCache.current) return;
+        hasLoadedCache.current = true;
+
+        if (!urlQuery) return;
+
+        const cached = loadFromCache();
+        if (cached && cached.query === urlQuery && cached.results.length > 0) {
+            isInitialCacheLoad.current = true;
+            loadCachedResults(cached.results, cached.availableSources);
+            hasSearchedWithSourcesRef.current = true;
+            return;
+        }
+
+        handleSearch(urlQuery);
+    }, [urlQuery, loadFromCache, loadCachedResults, handleSearch]);
 
     // Re-sort results when sort preference changes
     useEffect(() => {
@@ -90,15 +141,21 @@ export function useHomePage() {
             // Check if we need to re-trigger search due to new sources being loaded
             // This fixes the issue where initial visit has 0 sources, then sources are loaded async
             // but the search (or lack thereof) is already stuck with empty sources.
-            const enabledSources = settings.sources.filter(s => s.enabled);
-            const hasSources = enabledSources.length > 0;
+            const { sources: configuredSources, hasPendingSubscriptions } = getConfiguredSources();
+            const hasSources = configuredSources.length > 0;
+
+            setSourceState(
+                hasSources
+                    ? 'ready'
+                    : hasPendingSubscriptions && syncState !== 'done'
+                        ? 'loading'
+                        : 'empty'
+            );
 
             // If we have a query, and we haven't searched with sources yet,
             // and we suddenly have sources, trigger the search.
             if (query && hasSources && !hasSearchedWithSourcesRef.current && !loading) {
-                if (executeSearch(query)) {
-                    setHasSearched(true);
-                }
+                executeSearch(query);
             }
         };
 
@@ -106,55 +163,19 @@ export function useHomePage() {
         updateSettings();
 
         // Subscribe to changes
-        const unsubscribe = settingsStore.subscribe(updateSettings);
-        return () => unsubscribe();
-    }, [query, loading, executeSearch, currentSortBy]);
-
-    const handleSearch = useCallback((searchQuery: string) => {
-        if (!searchQuery.trim()) return;
-
-        // Clear scroll position for this search query to ensure we start at the top on a fresh search
-        const scrollKey = `scroll-pos:/?q=${encodeURIComponent(searchQuery)}`;
-        sessionStorage.removeItem(scrollKey);
-
-        // Reset cache load flag for new search
-        isInitialCacheLoad.current = false;
-
-        setQuery(searchQuery);
-        setHasSearched(true);
-        executeSearch(searchQuery);
-    }, [executeSearch]);
-
-    // Load cached results on mount
-    useEffect(() => {
-        if (hasLoadedCache.current) return;
-        hasLoadedCache.current = true;
-
-        const urlQuery = searchParams.get('q');
-        const cached = loadFromCache();
-
-        if (urlQuery) {
-            setQuery(urlQuery);
-            if (cached && cached.query === urlQuery && cached.results.length > 0) {
-                isInitialCacheLoad.current = true;
-                setHasSearched(true);
-                loadCachedResults(cached.results, cached.availableSources);
-                hasSearchedWithSourcesRef.current = true;
-            } else {
-                handleSearch(urlQuery);
-            }
-        }
-    }, [searchParams, loadFromCache, loadCachedResults, handleSearch]);
-
-
+        const unsubscribeSettings = settingsStore.subscribe(updateSettings);
+        const unsubscribeUserSources = userSourcesStore.subscribe(updateSettings);
+        return () => {
+            unsubscribeSettings();
+            unsubscribeUserSources();
+        };
+    }, [query, loading, executeSearch, currentSortBy, getConfiguredSources, syncState]);
 
     const handleCancelSearch = useCallback(() => {
         cancelSearch();
     }, [cancelSearch]);
 
     const handleReset = useCallback(() => {
-        setHasSearched(false);
-        setQuery('');
         hasSearchedWithSourcesRef.current = false;
         resetSearch();
         router.replace('/', { scroll: false });
@@ -163,6 +184,7 @@ export function useHomePage() {
     return {
         query,
         hasSearched,
+        sourceState,
         loading,
         results,
         availableSources,

@@ -31,7 +31,7 @@ export function PremiumContentGrid({
     return (
         <>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-6">
-                {videos.map((video) => (
+                {videos.map((video, index) => (
                     <Link
                         key={`${video.source}-${video.vod_id}`}
                         href={`/premium?q=${encodeURIComponent(video.vod_name)}`}
@@ -60,7 +60,9 @@ export function PremiumContentGrid({
                                         fill
                                         sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
                                         className="object-cover transition-transform duration-300 group-hover:scale-105 rounded-[var(--radius-2xl)]"
-                                        loading="eager"
+                                        loading={index < 4 ? 'eager' : 'lazy'}
+                                        fetchPriority={index < 4 ? 'high' : 'auto'}
+                                        decoding="async"
                                         unoptimized
                                     />
                                 ) : (

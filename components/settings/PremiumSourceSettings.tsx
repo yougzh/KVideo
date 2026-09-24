@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { SourceManager } from '@/components/settings/SourceManager';
 import type { VideoSource } from '@/lib/types';
 import { PREMIUM_SOURCES } from '@/lib/api/premium-sources';
+import { isVideoSourceEnabled } from '@/lib/utils/video-source';
 
 interface PremiumSourceSettingsProps {
     sources: VideoSource[];
@@ -32,7 +33,7 @@ export function PremiumSourceSettings({
 
     const handleToggle = (id: string) => {
         const updated = sources.map(s =>
-            s.id === id ? { ...s, enabled: !s.enabled } : s
+            s.id === id ? { ...s, enabled: !isVideoSourceEnabled(s) } : s
         );
         onSourcesChange(updated);
     };
@@ -58,7 +59,7 @@ export function PremiumSourceSettings({
     };
 
     return (
-        <div className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-sm)] p-6 mb-6">
+        <div id="premium-sources" className="bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-sm)] p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
                 <h2 className="text-xl font-semibold text-[var(--text-color)]">高级源管理</h2>
                 <div className="flex gap-2 flex-wrap">

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { VideoSource } from '@/lib/types';
+import { isVideoSourceEnabled } from '@/lib/utils/video-source';
 
 interface SourceManagerProps {
   sources: VideoSource[];
@@ -50,13 +51,13 @@ export function SourceManager({
                 aria-label={`切换 ${source.name} 状态`}
               >
                 <span
-                  className={`absolute inset-0 rounded-[var(--radius-full)] transition-all duration-[0.4s] cubic-bezier(0.2,0.8,0.2,1) ${source.enabled
+                  className={`absolute inset-0 rounded-[var(--radius-full)] transition-all duration-[0.4s] cubic-bezier(0.2,0.8,0.2,1) ${isVideoSourceEnabled(source)
                     ? 'bg-[var(--accent-color)]'
                     : 'bg-[color-mix(in_srgb,var(--text-color)_20%,transparent)]'
                     }`}
                 />
                 <span
-                  className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-[var(--radius-full)] shadow-sm transition-transform duration-[0.4s] cubic-bezier(0.2,0.8,0.2,1) ${source.enabled ? 'translate-x-5' : 'translate-x-0'
+                  className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-[var(--radius-full)] shadow-sm transition-transform duration-[0.4s] cubic-bezier(0.2,0.8,0.2,1) ${isVideoSourceEnabled(source) ? 'translate-x-5' : 'translate-x-0'
                     }`}
                 />
               </button>

@@ -1,6 +1,11 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useInfiniteScroll } from '@/lib/hooks/useInfiniteScroll';
 import { settingsStore } from '@/lib/store/settings-store';
+import {
+    createContentCacheKey,
+    readContentSnapshot,
+    writeContentSnapshot,
+} from '@/lib/utils/content-snapshot-cache';
 
 interface PremiumVideo {
     vod_id: string | number;
@@ -13,18 +18,40 @@ interface PremiumVideo {
 
 const PAGE_LIMIT = 20;
 
-export function usePremiumContent(categoryValue: string) {
+export function usePremiumContent(
+    categoryValue: string,
+    selectedTag = categoryValue,
+    refreshKey = 0
+) {
     const [videos, setVideos] = useState<PremiumVideo[]>([]);
     const [loading, setLoading] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [page, setPage] = useState(1);
+    const videosRef = useRef<PremiumVideo[]>([]);
+    const requestIdRef = useRef(0);
+    const inFlightRequestRef = useRef<number | null>(null);
+    const consumedRefreshKeyRef = useRef(refreshKey);
+    const [cacheEnabled, setCacheEnabled] = useState(true);
+    const contentCacheKey = createContentCacheKey(
+        'premium',
+        `${selectedTag}:${categoryValue}`
+    );
+    const cachedSnapshot = useMemo(
+        () => readContentSnapshot<PremiumVideo>(contentCacheKey),
+        [contentCacheKey]
+    );
 
     // Track source count to detect meaningful updates
     const sourceCountRef = useRef(0);
 
-    const loadVideos = useCallback(async (pageNum: number, append = false) => {
-        if (loading) return;
+    const loadVideos = useCallback(async (
+        pageNum: number,
+        append = false,
+        requestId = requestIdRef.current
+    ) => {
+        if (inFlightRequestRef.current === requestId) return;
 
+        inFlightRequestRef.current = requestId;
         setLoading(true);
         try {
             // Get sources from settings
@@ -62,18 +89,53 @@ export function usePremiumContent(categoryValue: string) {
             const data = await response.json();
             const newVideos = data.videos || [];
 
-            setVideos(prev => append ? [...prev, ...newVideos] : newVideos);
-            setHasMore(newVideos.length === PAGE_LIMIT);
+            if (requestId !== requestIdRef.current) return;
+
+            const nextVideos = append
+                ? [...videosRef.current, ...newVideos]
+                : newVideos;
+            const nextHasMore = newVideos.length === PAGE_LIMIT;
+
+            videosRef.current = nextVideos;
+            setVideos(nextVideos);
+            setHasMore(nextHasMore);
+            writeContentSnapshot(contentCacheKey, {
+                items: nextVideos,
+                page: pageNum,
+                hasMore: nextHasMore,
+            });
         } catch (error) {
             console.error('Failed to load videos:', error);
-            setHasMore(false);
+            if (requestId === requestIdRef.current) {
+                setHasMore(false);
+            }
         } finally {
-            setLoading(false);
+            if (requestId === requestIdRef.current) {
+                inFlightRequestRef.current = null;
+                setLoading(false);
+            }
         }
-    }, [loading, categoryValue]);
+    }, [categoryValue, contentCacheKey]);
 
     // Initial load and category change
     useEffect(() => {
+        const requestId = requestIdRef.current + 1;
+        requestIdRef.current = requestId;
+        inFlightRequestRef.current = null;
+        const bypassCache = consumedRefreshKeyRef.current !== refreshKey;
+        consumedRefreshKeyRef.current = refreshKey;
+        setCacheEnabled(!bypassCache);
+
+        if (cachedSnapshot && !bypassCache) {
+            videosRef.current = cachedSnapshot.items;
+            setVideos(cachedSnapshot.items);
+            setPage(cachedSnapshot.page);
+            setHasMore(cachedSnapshot.hasMore);
+            setLoading(false);
+            return;
+        }
+
+        videosRef.current = [];
         setPage(1);
         setVideos([]);
         setHasMore(true);
@@ -83,8 +145,8 @@ export function usePremiumContent(categoryValue: string) {
         const sourcesCount = settings.premiumSources.length + settings.subscriptions.length;
         sourceCountRef.current = sourcesCount;
 
-        loadVideos(1, false);
-    }, [categoryValue]); // eslint-disable-line react-hooks/exhaustive-deps
+        loadVideos(1, false, requestId);
+    }, [categoryValue, cachedSnapshot, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Subscribe to settings changes to handle async source loading
     useEffect(() => {
@@ -102,7 +164,7 @@ export function usePremiumContent(categoryValue: string) {
             if (videos.length === 0 && currentSourceCount > 0 && !loading) {
                 // Determine if we should reload. 
                 // Mostly needed when initial load failed due to no sources.
-                loadVideos(1, false);
+                loadVideos(1, false, requestIdRef.current);
             }
         };
 
@@ -116,12 +178,14 @@ export function usePremiumContent(categoryValue: string) {
         page,
         onLoadMore: (nextPage) => {
             setPage(nextPage);
-            loadVideos(nextPage, true);
+            loadVideos(nextPage, true, requestIdRef.current);
         },
     });
 
     return {
-        videos,
+        videos: cacheEnabled && videos.length === 0
+            ? cachedSnapshot?.items || videos
+            : videos,
         loading,
         hasMore,
         prefetchRef,

@@ -3,7 +3,7 @@
  * Displays video thumbnail, title, episode, progress, and delete button
  */
 
-import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { Icons } from '@/components/ui/Icon';
 import { formatTime, formatDate } from '@/lib/utils/format-utils';
 import { PosterImage } from './PosterImage';
@@ -19,6 +19,8 @@ interface HistoryItemProps {
 }
 
 export function HistoryItem({ item, onRemove, isPremium = false }: HistoryItemProps) {
+  const router = useRouter();
+
   const getVideoUrl = (): string => {
     const params = new URLSearchParams({
       id: item.videoId.toString(),
@@ -45,13 +47,19 @@ export function HistoryItem({ item, onRemove, isPremium = false }: HistoryItemPr
     return `/player?${params.toString()}`;
   };
 
-  const handleClick = (event: React.MouseEvent) => {
+  const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
     // Middle mouse or Ctrl/Cmd+click opens in new tab
     if (event.button === 1 || event.ctrlKey || event.metaKey) {
       event.preventDefault();
       window.open(getVideoUrl(), '_blank');
       return;
     }
+  };
+
+  const navigateToVideo = (event: React.MouseEvent) => {
+    if (event.button === 1 || event.ctrlKey || event.metaKey) return;
+    event.preventDefault();
+    router.push(getVideoUrl());
   };
 
   const progress = (item.playbackPosition / item.duration) * 100;
@@ -64,13 +72,10 @@ export function HistoryItem({ item, onRemove, isPremium = false }: HistoryItemPr
       <a
         href={getVideoUrl()}
         onClick={(e) => {
-          e.preventDefault();
-          handleClick(e as any);
-          if (!e.ctrlKey && !e.metaKey) {
-            window.location.href = getVideoUrl();
-          }
+          navigateToVideo(e);
+          handleClick(e);
         }}
-        onAuxClick={(e) => handleClick(e as any)}
+        onAuxClick={handleClick}
         className="block"
       >
         <div className="flex gap-3">

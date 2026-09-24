@@ -1,29 +1,40 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSearchCache } from '@/lib/hooks/useSearchCache';
 import { useParallelSearch } from '@/lib/hooks/useParallelSearch';
 import { useSubscriptionSync } from '@/lib/hooks/useSubscriptionSync';
-import { settingsStore } from '@/lib/store/settings-store';
+import { settingsStore, type SortOption } from '@/lib/store/settings-store';
 import { VideoSource } from '@/lib/types';
+import { isVideoSourceEnabled } from '@/lib/utils/video-source';
 
 export function usePremiumHomePage() {
-    useSubscriptionSync();
+    const { syncState } = useSubscriptionSync();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const { loadFromCache, saveToCache } = useSearchCache();
+    const { saveToCache } = useSearchCache();
     const hasLoadedCache = useRef(false);
     const hasSearchedWithSourcesRef = useRef(false);
+    const urlQuery = searchParams.get('q')?.trim() || '';
 
-    const [query, setQuery] = useState('');
-    const [hasSearched, setHasSearched] = useState(false);
-    const [currentSortBy, setCurrentSortBy] = useState('default');
+    const query = urlQuery;
+    const hasSearched = urlQuery.length > 0;
+    const currentSortBy: SortOption = 'default';
+    const [sourceState, setSourceState] = useState<'loading' | 'ready' | 'empty'>('loading');
 
-    // Use state for sources to trigger re-renders when they update
-    const [enabledPremiumSources, setEnabledPremiumSources] = useState<VideoSource[]>([]);
+    const getConfiguredSources = useCallback(() => {
+        const settings = settingsStore.getSettings();
+        return {
+            sources: settings.premiumSources.filter(isVideoSourceEnabled),
+            hasPendingSubscriptions: settings.subscriptions.some(
+                subscription => subscription.autoRefresh !== false
+            ),
+        };
+    }, []);
 
     const onUrlUpdate = useCallback((q: string) => {
-        router.replace(`/premium?q=${encodeURIComponent(q)}`, { scroll: false });
-    }, [router]);
+        if (q.trim() === urlQuery) return;
+        router.push(`/premium?q=${encodeURIComponent(q)}`, { scroll: false });
+    }, [router, urlQuery]);
 
     // Search stream hook
     const {
@@ -35,7 +46,6 @@ export function usePremiumHomePage() {
         performSearch,
         resetSearch,
         cancelSearch,
-        loadCachedResults,
         applySorting,
         loadMore,
         hasMore,
@@ -53,40 +63,67 @@ export function usePremiumHomePage() {
             return false;
         }
 
-        performSearch(searchQuery, sources, currentSortBy as any);
+        performSearch(searchQuery, sources, currentSortBy);
         hasSearchedWithSourcesRef.current = true;
         return true;
     }, [performSearch, currentSortBy]);
 
+    const handleSearch = useCallback((searchQuery: string) => {
+        const normalizedQuery = searchQuery.trim();
+        if (!normalizedQuery) return;
+
+        if (normalizedQuery !== urlQuery) {
+            router.push(`/premium?q=${encodeURIComponent(normalizedQuery)}`, { scroll: false });
+            return;
+        }
+
+        executeSearch(
+            normalizedQuery,
+            getConfiguredSources().sources
+        );
+    }, [executeSearch, getConfiguredSources, router, urlQuery]);
+
+    // Run the search for this URL on mount. The page is keyed by URL query,
+    // so back/forward navigation starts the destination search again.
+    useEffect(() => {
+        if (hasLoadedCache.current) return;
+        hasLoadedCache.current = true;
+
+        if (!urlQuery) return;
+
+        const currentSources = getConfiguredSources().sources;
+        if (currentSources.length > 0) {
+            handleSearch(urlQuery);
+        }
+    }, [getConfiguredSources, handleSearch, urlQuery]);
+
     // Re-sort results when sort preference changes
     useEffect(() => {
         if (hasSearched && results.length > 0) {
-            applySorting(currentSortBy as any);
+            applySorting(currentSortBy);
         }
     }, [currentSortBy, applySorting, hasSearched, results.length]);
 
     // Load sources and subscribe to changes
     useEffect(() => {
         const updateSettings = () => {
-            const settings = settingsStore.getSettings();
-
-            // Update sort preference if changed
-            // Note: settings.sortBy might be shared or we might want specific one, 
-            // but for now we follow the store or keep local state if we want independence.
-            // The original hook had local state 'default'.
-
-            const newPremiumSources = settings.premiumSources.filter(s => s.enabled);
-            setEnabledPremiumSources(newPremiumSources);
+            const { sources: newPremiumSources, hasPendingSubscriptions } = getConfiguredSources();
 
             // Check if we need to re-trigger search due to new sources being loaded
             const hasSources = newPremiumSources.length > 0;
 
+            setSourceState(
+                hasSources
+                    ? 'ready'
+                    : hasPendingSubscriptions && syncState !== 'done'
+                        ? 'loading'
+                        : 'empty'
+            );
+
             // If we have a query, and we haven't searched with sources yet,
             // and we suddenly have sources, trigger the search.
             if (query && hasSources && !hasSearchedWithSourcesRef.current && !loading) {
-                if (executeSearch(query, newPremiumSources)) {
-                    setHasSearched(true);
-                }
+                executeSearch(query, newPremiumSources);
             }
         };
 
@@ -96,39 +133,9 @@ export function usePremiumHomePage() {
         // Subscribe to changes
         const unsubscribe = settingsStore.subscribe(updateSettings);
         return () => unsubscribe();
-    }, [query, loading, executeSearch]);
-
-    // Load cached results on mount
-    useEffect(() => {
-        if (hasLoadedCache.current) return;
-        hasLoadedCache.current = true;
-
-        const urlQuery = searchParams.get('q');
-
-        if (urlQuery) {
-            setQuery(urlQuery);
-            // We need to wait for sources to be available, which is handled by the subscription effect
-            // But if sources are already available (e.g. navigation), execute immediately
-            const currentSettings = settingsStore.getSettings();
-            const currentSources = currentSettings.premiumSources.filter(s => s.enabled);
-
-            if (currentSources.length > 0) {
-                handleSearch(urlQuery);
-            }
-            // If no sources yet, the useEffect above will catch it when they load
-        }
-    }, [searchParams]);
-
-    const handleSearch = (searchQuery: string) => {
-        setQuery(searchQuery);
-        setHasSearched(true);
-        // Use current state of sources
-        executeSearch(searchQuery, enabledPremiumSources);
-    };
+    }, [query, loading, executeSearch, getConfiguredSources, syncState]);
 
     const handleReset = () => {
-        setHasSearched(false);
-        setQuery('');
         hasSearchedWithSourcesRef.current = false;
         resetSearch();
         router.replace('/premium', { scroll: false });
@@ -137,6 +144,7 @@ export function usePremiumHomePage() {
     return {
         query,
         hasSearched,
+        sourceState,
         loading,
         results,
         availableSources,

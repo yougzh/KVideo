@@ -22,7 +22,13 @@ export async function GET(request: Request) {
         }
 
         const data = await response.json();
-        return NextResponse.json(data);
+        return NextResponse.json(data, {
+            headers: {
+                'Cache-Control': 'public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800',
+                'CDN-Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+                'Cloudflare-CDN-Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+            },
+        });
     } catch (error) {
         console.error('Douban Tags API error:', error);
         return NextResponse.json(

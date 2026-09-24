@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { SourceManager } from '@/components/settings/SourceManager';
 import type { VideoSource } from '@/lib/types';
 import { DEFAULT_SOURCES } from '@/lib/api/default-sources';
+import { isVideoSourceEnabled } from '@/lib/utils/video-source';
 
 interface SourceSettingsProps {
     sources: VideoSource[];
@@ -32,7 +33,7 @@ export function SourceSettings({
 
     const handleToggle = (id: string) => {
         const updated = sources.map(s =>
-            s.id === id ? { ...s, enabled: !s.enabled } : s
+            s.id === id ? { ...s, enabled: !isVideoSourceEnabled(s) } : s
         );
         onSourcesChange(updated);
     };

@@ -6,12 +6,15 @@
 
 'use client';
 
-import { useState } from 'react';
 import { TagManager } from './TagManager';
 import { MovieGrid } from './MovieGrid';
 import { useTagManager } from './hooks/useTagManager';
 import { usePopularMovies } from './hooks/usePopularMovies';
 import { usePersonalizedRecommendations } from './hooks/usePersonalizedRecommendations';
+import {
+  DEFAULT_POPULAR_TAG_ID,
+  RECOMMEND_TAG_ID,
+} from '@/lib/utils/tag-navigation';
 
 interface DoubanMovie {
   id: string;
@@ -43,6 +46,7 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
     handleRestoreDefaults,
     handleDragEnd,
     isLoadingTags,
+    tagRefreshKey,
   } = useTagManager();
 
   const {
@@ -54,9 +58,10 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
     loadMoreRef: recommendLoadMoreRef,
   } = usePersonalizedRecommendations(false);
 
-  const [isRecommendSelected, setIsRecommendSelected] = useState(false);
-
-  const effectiveRecommendSelected = hasHistory && isRecommendSelected;
+  const effectiveRecommendSelected = hasHistory && selectedTag === RECOMMEND_TAG_ID;
+  const effectiveSelectedTag = selectedTag === RECOMMEND_TAG_ID && !hasHistory
+    ? DEFAULT_POPULAR_TAG_ID
+    : selectedTag;
   const isTagManagementMode = showTagManager;
 
   const {
@@ -66,9 +71,10 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
     prefetchRef,
     loadMoreRef,
   } = usePopularMovies(
-    effectiveRecommendSelected ? '' : selectedTag,
+    effectiveRecommendSelected ? '' : effectiveSelectedTag,
     tags,
-    contentType
+    contentType,
+    tagRefreshKey
   );
 
   const handleMovieClick = (movie: DoubanMovie) => {
@@ -78,7 +84,7 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
   };
 
   const handleRecommendSelect = () => {
-    setIsRecommendSelected(true);
+    setSelectedTag(RECOMMEND_TAG_ID);
   };
 
   const handleRegularTagSelect = (tagId: string) => {
@@ -86,7 +92,6 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
       window.location.href = '/premium';
       return;
     }
-    setIsRecommendSelected(false);
     setSelectedTag(tagId);
   };
 
@@ -124,7 +129,7 @@ export function PopularFeatures({ onSearch }: PopularFeaturesProps) {
 
       <TagManager
         tags={tags}
-        selectedTag={effectiveRecommendSelected ? '' : selectedTag}
+        selectedTag={effectiveRecommendSelected ? '' : effectiveSelectedTag}
         showTagManager={showTagManager}
         newTagInput={newTagInput}
         justAddedTag={justAddedTag}

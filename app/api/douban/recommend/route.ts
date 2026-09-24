@@ -34,7 +34,13 @@ export async function GET(request: Request) {
       }));
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: {
+        'Cache-Control': 'public, max-age=300, s-maxage=3600, stale-while-revalidate=86400',
+        'CDN-Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+        'Cloudflare-CDN-Cache-Control': 'public, max-age=3600, stale-while-revalidate=86400',
+      },
+    });
   } catch (error) {
     console.error('Douban API error:', error);
     return NextResponse.json(

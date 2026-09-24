@@ -70,10 +70,6 @@ export const VideoGrid = memo(function VideoGrid({
     return () => unsubscribe();
   }, [pathname, searchParams, videos.length]);
 
-  if (videos.length === 0) {
-    return null;
-  }
-
   // Build stable list of videos to probe for resolution
   const videosToProbe = useMemo(() => {
     if (displayMode === 'grouped') {
@@ -129,13 +125,11 @@ export const VideoGrid = memo(function VideoGrid({
   }, []);
 
   // Memoize the click handler
-  const handleCardClick = useCallback((e: React.MouseEvent, videoId: string, videoUrl: string) => {
+  const handleCardClick = useCallback((e: React.MouseEvent, videoId: string) => {
     const isMobile = window.innerWidth < 1024;
 
     if (isMobile) {
-      if (activeCardId === videoId) {
-        window.location.href = videoUrl;
-      } else {
+      if (activeCardId !== videoId) {
         e.preventDefault();
         setActiveCardId(videoId);
       }
@@ -246,4 +240,3 @@ export const VideoGrid = memo(function VideoGrid({
     </>
   );
 });
-

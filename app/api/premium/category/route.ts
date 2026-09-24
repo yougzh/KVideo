@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isVideoSourceEnabled } from '@/lib/utils/video-source';
 
 export const runtime = 'edge';
 // We still import this type but won't rely on the empty array
@@ -24,7 +25,7 @@ async function handleCategoryRequest(
                     sourceMap.set(sId, tId);
                 } else {
                     // Legacy: we can't guess without knowledge, but if we have sourceList we can try
-                    const firstSource = sourceList.find(s => s.enabled);
+                    const firstSource = sourceList.find(isVideoSourceEnabled);
                     if (firstSource) {
                         sourceMap.set(firstSource.id, part);
                     }
@@ -34,9 +35,9 @@ async function handleCategoryRequest(
 
         let targetSources = [];
         if (sourceMap.size > 0) {
-            targetSources = sourceList.filter(s => sourceMap.has(s.id) && s.enabled);
+            targetSources = sourceList.filter(s => sourceMap.has(s.id) && isVideoSourceEnabled(s));
         } else {
-            targetSources = sourceList.filter(s => s.enabled);
+            targetSources = sourceList.filter(isVideoSourceEnabled);
         }
 
         if (targetSources.length === 0) {

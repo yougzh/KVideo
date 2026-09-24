@@ -49,6 +49,8 @@ export async function GET(request: Request) {
             headers.set('Content-Type', contentType);
         }
         headers.set('Cache-Control', 'public, max-age=15720000, s-maxage=15720000');
+        headers.set('CDN-Cache-Control', 'public, max-age=15720000');
+        headers.set('Cloudflare-CDN-Cache-Control', 'public, max-age=15720000');
 
         return new Response(imageResponse.body, {
             status: 200,

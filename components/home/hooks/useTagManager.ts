@@ -1,9 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { DragEndEvent } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import type { Tag } from '../SortableTag';
+import {
+    buildTagUrl,
+    DEFAULT_POPULAR_TAG_ID,
+    getTagIdFromSearchParams,
+    RECOMMEND_TAG_ID,
+} from '@/lib/utils/tag-navigation';
 
-const DEFAULT_TAG = { id: 'popular', label: '热门', value: '热门' };
+const DEFAULT_TAG = { id: DEFAULT_POPULAR_TAG_ID, label: '热门', value: '热门' };
 
 const STORAGE_KEY_PREFIX = 'kvideo_custom_tags_';
 
@@ -20,22 +27,69 @@ const ensureDefaultTag = (tags: Tag[]) => {
 };
 
 export function useTagManager() {
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const searchParamsString = searchParams.toString();
+
     const [contentType, setContentType] = useState<'movie' | 'tv'>(() => {
         if (typeof window === 'undefined') return 'movie';
         const saved = localStorage.getItem('kvideo_default_content_type');
         return saved === 'tv' ? 'tv' : 'movie';
     });
-    const [selectedTag, setSelectedTag] = useState(DEFAULT_TAG.id);
+    const [selectedTag, setSelectedTagState] = useState(() =>
+        getTagIdFromSearchParams(
+            new URLSearchParams(searchParamsString),
+            DEFAULT_TAG.id
+        )
+    );
     const [tags, setTags] = useState<Tag[]>([]);
     const [isLoadingTags, setIsLoadingTags] = useState(false);
     const [newTagInput, setNewTagInput] = useState('');
     const [showTagManager, setShowTagManager] = useState(false);
     const [justAddedTag, setJustAddedTag] = useState(false);
+    const [tagRefreshKey, setTagRefreshKey] = useState(0);
 
     // Persist content type preference
     useEffect(() => {
         localStorage.setItem('kvideo_default_content_type', contentType);
     }, [contentType]);
+
+    const navigateToTag = useCallback((tagId: string, replace = false) => {
+        const nextUrl = buildTagUrl(pathname, searchParamsString, tagId);
+        if (nextUrl === `${pathname}${searchParamsString ? `?${searchParamsString}` : ''}`) {
+            return;
+        }
+
+        if (replace) {
+            router.replace(nextUrl, { scroll: false });
+        } else {
+            router.push(nextUrl, { scroll: false });
+        }
+    }, [pathname, router, searchParamsString]);
+
+    const setSelectedTag = useCallback((tagId: string) => {
+        setSelectedTagState(tagId);
+        setTagRefreshKey((current) => current + 1);
+        navigateToTag(tagId);
+    }, [navigateToTag]);
+
+    const handleContentTypeChange = useCallback((nextType: 'movie' | 'tv') => {
+        setContentType(nextType);
+        setSelectedTagState(DEFAULT_TAG.id);
+        setTagRefreshKey((current) => current + 1);
+        navigateToTag(DEFAULT_TAG.id, true);
+    }, [navigateToTag]);
+
+    // URL is the source of truth for tag selection, so browser back/forward
+    // restores the tag associated with each history entry.
+    useEffect(() => {
+        const nextTag = getTagIdFromSearchParams(
+            new URLSearchParams(searchParamsString),
+            DEFAULT_TAG.id
+        );
+        setSelectedTagState(nextTag);
+    }, [searchParamsString]);
 
     const storageKey = `${STORAGE_KEY_PREFIX}${contentType}`;
 
@@ -65,9 +119,9 @@ export function useTagManager() {
                         value: label,
                     }));
 
-                    setTags(ensureDefaultTag(mappedTags));
-                    // Also save to localStorage to avoid repeated fetches if desired
-                    // Actually, let's just keep them in memory for now unless they customize
+                    const cachedTags = ensureDefaultTag(mappedTags);
+                    setTags(cachedTags);
+                    localStorage.setItem(storageKey, JSON.stringify(cachedTags));
                 } else {
                     setTags([DEFAULT_TAG]);
                 }
@@ -80,8 +134,20 @@ export function useTagManager() {
         };
 
         loadTags();
-        setSelectedTag(DEFAULT_TAG.id);
     }, [contentType, storageKey]);
+
+    // If a URL points to a tag that no longer exists, replace it with the
+    // default without adding another entry to browser history.
+    useEffect(() => {
+        if (isLoadingTags || tags.length === 0 || selectedTag === RECOMMEND_TAG_ID) {
+            return;
+        }
+
+        if (!tags.some((tag) => tag.id === selectedTag)) {
+            setSelectedTagState(DEFAULT_TAG.id);
+            navigateToTag(DEFAULT_TAG.id, true);
+        }
+    }, [isLoadingTags, navigateToTag, selectedTag, tags]);
 
     const saveTags = (newTags: Tag[]) => {
         setTags(newTags);
@@ -122,7 +188,9 @@ export function useTagManager() {
                     label,
                     value: label,
                 }));
-                setTags(ensureDefaultTag(mappedTags));
+                const restoredTags = ensureDefaultTag(mappedTags);
+                setTags(restoredTags);
+                localStorage.setItem(storageKey, JSON.stringify(restoredTags));
             } else {
                 setTags([DEFAULT_TAG]);
             }
@@ -153,7 +221,8 @@ export function useTagManager() {
         showTagManager,
         justAddedTag,
         isLoadingTags,
-        setContentType,
+        tagRefreshKey,
+        setContentType: handleContentTypeChange,
         setSelectedTag,
         setNewTagInput,
         setShowTagManager,

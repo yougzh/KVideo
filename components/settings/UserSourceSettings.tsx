@@ -49,7 +49,7 @@ export function UserSourceSettings() {
   };
 
   return (
-    <SettingsSection title="个人视频源" description="添加你自己的视频源，不影响其他用户。">
+    <SettingsSection id="personal-sources" title="个人视频源" description="添加你自己的视频源，不影响其他用户。">
       <div className="space-y-4">
         {/* Add form */}
         <form onSubmit={handleAdd} className="space-y-3">
