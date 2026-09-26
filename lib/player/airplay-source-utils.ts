@@ -20,5 +20,5 @@ export function shouldPreferProxiedNativePlayback({
         return false;
     }
 
-    return !src.includes('/api/proxy') && /\.(m3u8)(?:[?#]|$)/i.test(src);
+    return !src.includes('/api/proxy');
 }

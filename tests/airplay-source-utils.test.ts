@@ -8,7 +8,7 @@ test('iOS native HLS uses the server proxy so AirPlay receives real segments', (
     isIOS: true,
     mediaProxyEnabled: true,
     isNativeHlsSupported: true,
-    src: 'https://example.com/video/index.m3u8',
+    src: 'https://example.com/video/play?episode=1',
   }), true);
 });
 
@@ -17,7 +17,7 @@ test('AirPlay proxy preference ignores non-iOS, proxied, and unsupported sources
     isIOS: false,
     mediaProxyEnabled: true,
     isNativeHlsSupported: true,
-    src: 'https://example.com/video/index.m3u8',
+    src: 'https://example.com/video/play?episode=1',
   }), false);
 
   assert.equal(shouldPreferProxiedNativePlayback({
@@ -31,13 +31,13 @@ test('AirPlay proxy preference ignores non-iOS, proxied, and unsupported sources
     isIOS: true,
     mediaProxyEnabled: true,
     isNativeHlsSupported: false,
-    src: 'https://example.com/video/index.m3u8',
+    src: 'https://example.com/video/play?episode=1',
   }), false);
 
   assert.equal(shouldPreferProxiedNativePlayback({
     isIOS: true,
     mediaProxyEnabled: false,
     isNativeHlsSupported: true,
-    src: 'https://example.com/video/index.m3u8',
+    src: 'https://example.com/video/play?episode=1',
   }), false);
 });

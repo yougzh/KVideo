@@ -23,6 +23,11 @@ export async function GET(request: NextRequest) {
     }
 
     const url = request.nextUrl.searchParams.get('url');
+    const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+    const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+    const requestHost = forwardedHost || request.headers.get('host') || request.nextUrl.host;
+    const requestProto = forwardedProto || request.nextUrl.protocol.replace(':', '');
+    const requestOrigin = `${requestProto}://${requestHost}`;
 
     if (!url) {
         return new NextResponse('Missing URL parameter', { status: 400 });
@@ -67,7 +72,7 @@ export async function GET(request: NextRequest) {
 
             // Verify it's actually M3U8 content (starts with #EXTM3U or #EXT-X-)
             if (text.trim().startsWith('#EXTM3U') || text.trim().startsWith('#EXT-X-')) {
-                const modifiedText = await processM3u8Content(text, url, request.nextUrl.origin);
+                const modifiedText = await processM3u8Content(text, url, requestOrigin);
 
                 return new NextResponse(modifiedText, {
                     status: response.status,
