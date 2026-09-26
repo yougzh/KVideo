@@ -3,6 +3,8 @@ import Hls from 'hls.js';
 import { usePlayerSettings } from './usePlayerSettings';
 import { filterM3u8Ad } from '@/lib/utils/m3u8-utils';
 import { useRuntimeFeatures } from '@/components/RuntimeFeaturesProvider';
+import { useIsIOS } from '@/lib/hooks/mobile/useDeviceDetection';
+import { shouldPreferProxiedNativePlayback } from '@/lib/player/airplay-source-utils';
 
 interface UseHlsPlayerProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -24,11 +26,21 @@ export function useHlsPlayer({
     const hlsRef = useRef<Hls | null>(null);
     const { adFilterMode, adKeywords } = usePlayerSettings(isPremium);
     const { mediaProxyEnabled } = useRuntimeFeatures();
+    const isIOS = useIsIOS();
     const isAdFilterEnabled = adFilterMode !== 'off';
+    const shouldUseNativeAirPlayProxy = shouldPreferProxiedNativePlayback({
+        isIOS,
+        mediaProxyEnabled,
+        isNativeHlsSupported: true,
+        src,
+    });
+    const playbackSrc = shouldUseNativeAirPlayProxy
+        ? `/api/proxy?url=${encodeURIComponent(src)}`
+        : src;
 
     useEffect(() => {
         const video = videoRef.current;
-        if (!video || !src) return;
+        if (!video || !playbackSrc) return;
 
         // Cleanup previous HLS instance
         if (hlsRef.current) {
@@ -127,7 +139,7 @@ export function useHlsPlayer({
                 hls = new Hls(config);
                 hlsRef.current = hls;
 
-                hls.loadSource(src);
+                hls.loadSource(playbackSrc);
                 hls.attachMedia(video);
 
                 // Auto Play Handler
@@ -211,7 +223,7 @@ export function useHlsPlayer({
                 });
             } else {
                 // Native HLS (Desktop Safari, no Filter)
-                video.src = src;
+                video.src = playbackSrc;
             }
         } else if (isNativeHlsSupported) {
             // Native HLS (iOS, Mobile Safari)
@@ -220,7 +232,7 @@ export function useHlsPlayer({
             // If the ad discontinuity is in the master playlist (rare for ads, common for periods), it works.
             // If it's in sub-playlists, it might fail unless we parse and blob those too (complex).
 
-            if (isAdFilterEnabled) {
+            if (!shouldUseNativeAirPlayProxy && isAdFilterEnabled) {
                 const fetchWithFallback = async (url: string): Promise<string> => {
                     try {
                         const res = await fetch(url);
@@ -343,7 +355,7 @@ export function useHlsPlayer({
                     }
                 };
 
-                processMasterPlaylist(src).then((result) => {
+                processMasterPlaylist(playbackSrc).then((result) => {
                     video.src = result.masterBlobUrl;
                     extraBlobs = result.allBlobs;
 
@@ -360,7 +372,7 @@ export function useHlsPlayer({
                         // Revoke blob URLs immediately
                         extraBlobs.forEach(url => URL.revokeObjectURL(url));
                         extraBlobs = [];
-                        video.src = src;
+                        video.src = playbackSrc;
                     };
 
                     video.addEventListener('error', onBlobError);
@@ -383,17 +395,17 @@ export function useHlsPlayer({
                 }).catch((e) => {
                     console.warn('[HLS Native] Ad filtering failed, falling back to original source.', e);
                     onError?.('广告过滤失败，已回退到原始视频流');
-                    video.src = src;
+                    video.src = playbackSrc;
                 });
 
             } else {
-                video.src = src;
+                video.src = playbackSrc;
             }
         } else {
             // Neither MSE nor native HLS supported
             // Try direct playback as last resort (works for mp4 and some browser WebView)
             console.warn('[HLS] No MSE or native HLS support. Trying direct playback...');
-            video.src = src;
+            video.src = playbackSrc;
 
             let directFailed = false;
             const handleCanPlay = () => {
@@ -407,7 +419,7 @@ export function useHlsPlayer({
                     return;
                 }
                 // Try proxied URL as final attempt
-                const proxiedUrl = `/api/proxy?url=${encodeURIComponent(src)}`;
+                const proxiedUrl = `/api/proxy?url=${encodeURIComponent(playbackSrc)}`;
                 video.src = proxiedUrl;
                 video.addEventListener('error', () => {
                     onError?.('当前浏览器不支持 HLS 视频播放。建议使用 Chrome、Edge 或 Safari 浏览器。');
@@ -424,5 +436,5 @@ export function useHlsPlayer({
             }
             extraBlobs.forEach(url => URL.revokeObjectURL(url));
         };
-    }, [src, videoRef, autoPlay, onAutoPlayPrevented, onError, isAdFilterEnabled, adFilterMode, adKeywords, mediaProxyEnabled]);
+    }, [playbackSrc, videoRef, autoPlay, onAutoPlayPrevented, onError, isAdFilterEnabled, adFilterMode, adKeywords, mediaProxyEnabled, isIOS, shouldUseNativeAirPlayProxy]);
 }

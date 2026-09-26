@@ -51,3 +51,10 @@ Previously, the player forced **Web Fullscreen** (Custom UI) on all iOS devices 
 5. Tap the Fullscreen button on the video player to enter fullscreen.
 
 > **Note for iOS Users:** If "Web Fullscreen" feels buggy (e.g., orientation issues), try locking your phone's orientation to Portrait before entering fullscreen, or switch to "System Fullscreen" for a more stable experience.
+
+## AirPlay Playback
+
+When media proxying is available, KVideo now sends iOS Safari a real, proxied HLS
+playlist instead of a locally generated `blob:` playlist. This lets Safari and the
+AirPlay receiver use native adaptive streaming, which is more stable and can keep
+the video track instead of falling back to audio-only playback.
