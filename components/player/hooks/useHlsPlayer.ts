@@ -56,8 +56,12 @@ export function useHlsPlayer({
 
         // Check if MSE is available (required by HLS.js)
         const isMSESupported = Hls.isSupported();
+        // Newer iOS Safari exposes ManagedMediaSource, so hls.js can claim
+        // support. AirPlay receivers still need the real playlist instead of an
+        // MSE composition, so native HLS must win here.
+        const shouldForceNativeHls = shouldUseNativeAirPlayProxy && isNativeHlsSupported;
 
-        if (isMSESupported) {
+        if (isMSESupported && !shouldForceNativeHls) {
 
             // Define custom loader class to intercept manifest loading
             // We use 'any' cast because default loader type might not be strictly exposed in all typings
