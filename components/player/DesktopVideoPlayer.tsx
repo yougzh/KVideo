@@ -284,6 +284,7 @@ export function DesktopVideoPlayer({
     togglePlay,
     handlePlay,
     handlePause,
+    handlePlaybackStarted,
     handleTimeUpdateEvent,
     handleLoadedMetadata,
     handleProgressEvent,
@@ -376,6 +377,8 @@ export function DesktopVideoPlayer({
             controls={false} // Explicitly disable native controls
             onPlay={handlePlay}
             onPause={handlePause}
+            onLoadedData={handlePlaybackStarted}
+            onPlaying={handlePlaybackStarted}
             onTimeUpdate={handleTimeUpdateEvent}
             onLoadedMetadata={handleLoadedMetadata}
             onProgress={handleProgressEvent}

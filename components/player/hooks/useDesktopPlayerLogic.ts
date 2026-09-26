@@ -163,6 +163,7 @@ export function useDesktopPlayerLogic({
         togglePlay: playbackControls.togglePlay,
         handlePlay: playbackControls.handlePlay,
         handlePause: playbackControls.handlePause,
+        handlePlaybackStarted: playbackControls.handlePlaybackStarted,
         handleTimeUpdateEvent: playbackControls.handleTimeUpdateEvent,
         handleLoadedMetadata: playbackControls.handleLoadedMetadata,
         handleProgressEvent: playbackControls.handleProgressEvent,

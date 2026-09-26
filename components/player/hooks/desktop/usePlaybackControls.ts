@@ -85,17 +85,22 @@ export function usePlaybackControls({
     const handlePlay = useCallback(() => setIsPlaying(true), [setIsPlaying]);
     const handlePause = useCallback(() => setIsPlaying(false), [setIsPlaying]);
 
+    const handlePlaybackStarted = useCallback(() => setIsLoading(false), [setIsLoading]);
+
     const handleTimeUpdateEvent = useCallback(() => {
         if (!videoRef.current || isDraggingProgressRef.current) return;
         const current = videoRef.current.currentTime;
         const total = videoRef.current.duration;
+        if (videoRef.current.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+            setIsLoading(false);
+        }
         setCurrentTime(current);
         setDuration(total);
         updateBufferedTime();
         if (onTimeUpdate) {
             onTimeUpdate(current, total);
         }
-    }, [videoRef, isDraggingProgressRef, setCurrentTime, setDuration, updateBufferedTime, onTimeUpdate]);
+    }, [videoRef, isDraggingProgressRef, setCurrentTime, setDuration, updateBufferedTime, setIsLoading, onTimeUpdate]);
 
     const handleLoadedMetadata = useCallback(() => {
         if (!videoRef.current) return;
@@ -187,6 +192,7 @@ export function usePlaybackControls({
         togglePlay,
         handlePlay,
         handlePause,
+        handlePlaybackStarted,
         handleTimeUpdateEvent,
         handleLoadedMetadata,
         handleProgressEvent,
@@ -197,6 +203,7 @@ export function usePlaybackControls({
         togglePlay,
         handlePlay,
         handlePause,
+        handlePlaybackStarted,
         handleTimeUpdateEvent,
         handleLoadedMetadata,
         handleProgressEvent,
