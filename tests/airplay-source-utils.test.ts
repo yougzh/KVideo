@@ -6,38 +6,22 @@ import { shouldPreferProxiedNativePlayback } from '../lib/player/airplay-source-
 test('iOS native HLS uses the server proxy so AirPlay receives real segments', () => {
   assert.equal(shouldPreferProxiedNativePlayback({
     isIOS: true,
-    mediaProxyEnabled: true,
     isNativeHlsSupported: true,
-    src: 'https://example.com/video/play?episode=1',
+  }), true);
+  assert.equal(shouldPreferProxiedNativePlayback({
+    isIOS: true,
+    isNativeHlsSupported: true,
   }), true);
 });
 
-test('AirPlay proxy preference ignores non-iOS, proxied, and unsupported sources', () => {
+test('AirPlay native HLS preference ignores non-iOS and unsupported sources', () => {
   assert.equal(shouldPreferProxiedNativePlayback({
     isIOS: false,
-    mediaProxyEnabled: true,
     isNativeHlsSupported: true,
-    src: 'https://example.com/video/play?episode=1',
   }), false);
 
   assert.equal(shouldPreferProxiedNativePlayback({
     isIOS: true,
-    mediaProxyEnabled: true,
-    isNativeHlsSupported: true,
-    src: '/api/proxy?url=https%3A%2F%2Fexample.com%2Fvideo%2Findex.m3u8',
-  }), false);
-
-  assert.equal(shouldPreferProxiedNativePlayback({
-    isIOS: true,
-    mediaProxyEnabled: true,
     isNativeHlsSupported: false,
-    src: 'https://example.com/video/play?episode=1',
-  }), false);
-
-  assert.equal(shouldPreferProxiedNativePlayback({
-    isIOS: true,
-    mediaProxyEnabled: false,
-    isNativeHlsSupported: true,
-    src: 'https://example.com/video/play?episode=1',
   }), false);
 });

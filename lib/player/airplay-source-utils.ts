@@ -1,8 +1,6 @@
 export interface NativeAirPlaySourceOptions {
     isIOS: boolean;
-    mediaProxyEnabled: boolean;
     isNativeHlsSupported: boolean;
-    src: string;
 }
 
 /**
@@ -12,13 +10,14 @@ export interface NativeAirPlaySourceOptions {
  */
 export function shouldPreferProxiedNativePlayback({
     isIOS,
-    mediaProxyEnabled,
     isNativeHlsSupported,
-    src,
 }: NativeAirPlaySourceOptions): boolean {
-    if (!isIOS || !mediaProxyEnabled || !isNativeHlsSupported) {
+    if (!isIOS || !isNativeHlsSupported) {
         return false;
     }
 
-    return !src.includes('/api/proxy');
+    // The caller may already provide a proxied source. Native HLS still has to
+    // win; otherwise hls.js/ManagedMSE turns the stream into an MSE composition
+    // that AirPlay receivers commonly play as audio-only.
+    return true;
 }

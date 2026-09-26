@@ -30,12 +30,12 @@ export function useHlsPlayer({
     const isAdFilterEnabled = adFilterMode !== 'off';
     const shouldUseNativeAirPlayProxy = shouldPreferProxiedNativePlayback({
         isIOS,
-        mediaProxyEnabled,
         isNativeHlsSupported: true,
-        src,
     });
     const playbackSrc = shouldUseNativeAirPlayProxy
-        ? `/api/proxy?url=${encodeURIComponent(src)}`
+        ? src.includes('/api/proxy') || !mediaProxyEnabled
+            ? src
+            : `/api/proxy?url=${encodeURIComponent(src)}`
         : src;
 
     useEffect(() => {
