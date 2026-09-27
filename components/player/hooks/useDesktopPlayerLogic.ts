@@ -203,11 +203,6 @@ export function useDesktopPlayerLogic({
         startSpeedMenuTimeout: controlsVisibility.startSpeedMenuTimeout,
         clearSpeedMenuTimeout: controlsVisibility.clearSpeedMenuTimeout,
         handleDownload: utilities.handleDownload,
-        pauseDownload: utilities.pauseDownload,
-        resumeDownload: utilities.resumeDownload,
-        cancelDownload: utilities.cancelDownload,
-        dismissDownload: utilities.dismissDownload,
-        downloadState: utilities.downloadState,
         isDownloading: utilities.isDownloading,
         formatTime: playbackControls.formatTime
     }), [
