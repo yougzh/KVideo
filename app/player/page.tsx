@@ -446,7 +446,7 @@ function PlayerContent() {
           <div className={`grid gap-6 lg:grid-cols-3 lg:items-start ${playerGridClass}`}>
             {/* Video Player Section */}
             <div className="lg:col-span-2 xl:col-span-1 space-y-6">
-              <div className="sticky top-0 z-40 -mx-4 bg-[var(--bg-color)] px-4 pt-2 sm:mx-0 sm:px-0 lg:top-24">
+              <div className="kvideo-sticky-wrapper sticky top-0 z-40 bg-[var(--bg-color)] py-2 lg:top-24">
                 <VideoPlayer
                   playUrl={playUrl}
                   videoId={videoId || undefined}

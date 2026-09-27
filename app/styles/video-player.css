@@ -3,6 +3,32 @@
     container-type: inline-size;
 }
 
+/* Keep the sticky player inside every viewport, including short landscape windows. */
+.kvideo-sticky-wrapper {
+    --kvideo-sticky-reserved: 5rem;
+    max-width: 100%;
+    overflow: visible;
+}
+
+.kvideo-sticky-wrapper .kvideo-container:not(.is-web-fullscreen) {
+    width: min(100%, calc((100vh - var(--kvideo-sticky-reserved)) * 16 / 9));
+    height: auto;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+@supports (height: 100dvh) {
+    .kvideo-sticky-wrapper .kvideo-container:not(.is-web-fullscreen) {
+        width: min(100%, calc((100dvh - var(--kvideo-sticky-reserved)) * 16 / 9));
+    }
+}
+
+@media (min-width: 1024px) {
+    .kvideo-sticky-wrapper {
+        --kvideo-sticky-reserved: 8rem;
+    }
+}
+
 .spinner {
     width: 48px;
     height: 48px;
