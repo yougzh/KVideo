@@ -9,6 +9,17 @@ export function getCopyUrl(src: string, type: 'original' | 'proxy' = 'original')
                 urlToCopy = decodeURIComponent(match[1]);
             }
         }
+
+        // QQ Browser and several mobile WebViews block HTTP media inside an
+        // HTTPS page. Keep the copied link usable by routing it through the
+        // same-origin HTTPS proxy in that case.
+        if (
+            typeof window !== 'undefined' &&
+            window.location.protocol === 'https:' &&
+            urlToCopy.startsWith('http://')
+        ) {
+            urlToCopy = `${window.location.origin}/api/proxy?url=${encodeURIComponent(urlToCopy)}`;
+        }
     }
     // If user wants proxy link, ensure it has proxy prefix
     else if (type === 'proxy') {

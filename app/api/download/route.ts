@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createReadStream } from 'node:fs';
+import { open, stat, unlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import { randomUUID } from 'node:crypto';
 
-export const runtime = 'edge';
+export const runtime = 'nodejs';
 
 interface MediaSegment {
   url: string;
@@ -147,7 +153,15 @@ function parsePlaylist(text: string, baseUrl: string): ParsedPlaylist | { varian
 }
 
 async function fetchResource(url: string): Promise<Response> {
-  const response = await fetch(url, { headers: FETCH_HEADERS });
+  const parsed = new URL(url);
+  const origin = parsed.origin;
+  const response = await fetch(url, {
+    headers: {
+      ...FETCH_HEADERS,
+      Referer: `${origin}/`,
+      Origin: origin,
+    },
+  });
   if (!response.ok) {
     throw new Error(`下载失败：HTTP ${response.status}`);
   }
@@ -206,11 +220,12 @@ async function loadSegment(segment: MediaSegment): Promise<ArrayBuffer> {
     : data;
 }
 
-function buildDownloadHeaders(filename: string): Headers {
+function buildDownloadHeaders(filename: string, contentLength: number): Headers {
   const headers = new Headers();
   const safeName = filename.replace(/[\r\n"]/g, '_');
   headers.set('Content-Type', 'video/mp2t');
   headers.set('Content-Disposition', `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+  headers.set('Content-Length', String(contentLength));
   headers.set('Cache-Control', 'no-store');
   headers.set('Access-Control-Allow-Origin', '*');
   return headers;
@@ -241,32 +256,38 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(result);
     }
 
-    const encoder = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        try {
-          if (playlist.initUrl) {
-            const initResponse = await fetchResource(playlist.initUrl);
-            const initData = await initResponse.arrayBuffer();
-            const data = playlist.initKey
-              ? await decryptSegment(initData, playlist.initKey, 0)
-              : initData;
-            controller.enqueue(new Uint8Array(data));
-          }
+    const tempPath = join(tmpdir(), `kvideo-download-${randomUUID()}.ts`);
+    const file = await open(tempPath, 'w');
+    try {
+      if (playlist.initUrl) {
+        const initResponse = await fetchResource(playlist.initUrl);
+        const initData = await initResponse.arrayBuffer();
+        const data = playlist.initKey
+          ? await decryptSegment(initData, playlist.initKey, 0)
+          : initData;
+        await file.write(new Uint8Array(data));
+      }
 
-          for (const segment of playlist.segments) {
-            const data = await loadSegment(segment);
-            controller.enqueue(new Uint8Array(data));
-          }
-          controller.close();
-        } catch (error) {
-          controller.error(error);
-        }
-      },
+      for (const segment of playlist.segments) {
+        const data = await loadSegment(segment);
+        await file.write(new Uint8Array(data));
+      }
+      await file.close();
+    } catch (error) {
+      await file.close().catch(() => undefined);
+      await unlink(tempPath).catch(() => undefined);
+      throw error;
+    }
+
+    const fileInfo = await stat(tempPath);
+    const fileStream = createReadStream(tempPath);
+    fileStream.once('close', () => {
+      void unlink(tempPath).catch(() => undefined);
     });
 
-    return new Response(encoder, {
+    return new Response(Readable.toWeb(fileStream) as unknown as ReadableStream<Uint8Array>, {
       status: 200,
-      headers: buildDownloadHeaders(filename),
+      headers: buildDownloadHeaders(filename, fileInfo.size),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : '下载准备失败';

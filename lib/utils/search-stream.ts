@@ -23,6 +23,20 @@ interface StreamHandlerParams {
     currentQuery: string;
 }
 
+export function prepareSearchVideos(rawVideos: any[], currentQuery: string): Video[] {
+    const blockedCategories = settingsStore.getSettings().blockedCategories;
+
+    return rawVideos
+        .filter((video: any) => hasMinimumMatch(video.vod_name, currentQuery))
+        .filter((video: any) => !isCategoryBlocked(video, blockedCategories))
+        .map((video: any) => ({
+            ...video,
+            sourceName: video.sourceDisplayName || getSourceName(video.source),
+            isNew: true,
+            relevanceScore: calculateRelevanceScore(video, currentQuery),
+        }));
+}
+
 export async function processSearchStream({
     reader,
     onStart,
@@ -36,8 +50,6 @@ export async function processSearchStream({
     const decoder = new TextDecoder();
     let buffer = '';
     let isCompleted = false;
-
-    const blockedCategories = settingsStore.getSettings().blockedCategories;
 
     while (true) {
         const { done, value } = await reader.read();
@@ -62,15 +74,7 @@ export async function processSearchStream({
                 if (data.type === 'start') {
                     onStart(data.totalSources);
                 } else if (data.type === 'videos') {
-                    const newVideos: Video[] = data.videos
-                        .filter((video: any) => hasMinimumMatch(video.vod_name, currentQuery))
-                        .filter((video: any) => !isCategoryBlocked(video, blockedCategories))
-                        .map((video: any) => ({
-                            ...video,
-                            sourceName: video.sourceDisplayName || getSourceName(video.source),
-                            isNew: true,
-                            relevanceScore: calculateRelevanceScore(video, currentQuery),
-                        }));
+                    const newVideos = prepareSearchVideos(data.videos, currentQuery);
                     onVideos(newVideos, data.source);
                     if (data.pagecount && onPageInfo) {
                         onPageInfo(data.pagecount);

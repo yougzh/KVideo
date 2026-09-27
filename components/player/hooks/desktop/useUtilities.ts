@@ -40,6 +40,24 @@ function startNativeDownload(url: string, filename: string) {
     anchor.remove();
 }
 
+function fallbackCopyText(text: string): boolean {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    textarea.style.top = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
+
+    try {
+        return document.execCommand('copy');
+    } finally {
+        textarea.remove();
+    }
+}
+
 export function useUtilities({
     src,
     videoTitle,
@@ -66,10 +84,19 @@ export function useUtilities({
     }, [setToastMessage, setShowToast, toastTimeoutRef]);
 
     const handleCopyLink = useCallback(async (url?: string) => {
+        const text = url || src;
         try {
-            await navigator.clipboard.writeText(url || src);
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+            } else if (!fallbackCopyText(text)) {
+                throw new Error('Clipboard API unavailable');
+            }
             showToastNotification('链接已复制到剪贴板');
         } catch (error) {
+            if (fallbackCopyText(text)) {
+                showToastNotification('链接已复制到剪贴板');
+                return;
+            }
             console.error('Copy failed:', error);
             showToastNotification('复制失败，请重试');
         }

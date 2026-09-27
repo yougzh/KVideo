@@ -1,7 +1,7 @@
 import { useRef, useCallback } from 'react';
 import { sortVideos } from '@/lib/utils/sort';
 import { binaryInsertVideos } from '@/lib/utils/sorted-insert';
-import { processSearchStream } from '@/lib/utils/search-stream';
+import { prepareSearchVideos, processSearchStream } from '@/lib/utils/search-stream';
 import type { SortOption } from '@/lib/store/settings-store';
 import type { SourceBadge, Video } from '@/lib/types';
 import { settingsStore } from '@/lib/store/settings-store';
@@ -98,6 +98,84 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
             }
         }
 
+        const applyVideos = (newVideos: Video[], sourceId: string) => {
+            if (newVideos.length === 0) return;
+            setResults((prev) => binaryInsertVideos(prev, newVideos));
+
+            const existing = sourcesMap.get(sourceId);
+            if (existing) {
+                existing.count += newVideos.length;
+            } else {
+                sourcesMap.set(sourceId, {
+                    count: newVideos.length,
+                    name: newVideos[0]?.sourceName || sourceId,
+                    baseUrl: sourceConfigs.get(sourceId)?.baseUrl,
+                });
+            }
+        };
+
+        const finalizeSearch = () => {
+            setLoading(false);
+
+            const sources = Array.from(sourcesMap.entries()).map(([id, info]) => ({
+                id,
+                name: info.name,
+                count: info.count,
+                ...(info.baseUrl ? { baseUrl: info.baseUrl } : {}),
+            }));
+            setAvailableSources(sources);
+
+            setResults((currentResults) => {
+                const sorted = sortVideos(currentResults, sortBy);
+
+                searchMemoryCacheRef.current.set(memoryCacheKey, {
+                    results: sorted,
+                    sources,
+                    timestamp: Date.now(),
+                });
+                while (searchMemoryCacheRef.current.size > 16) {
+                    const oldestKey = searchMemoryCacheRef.current.keys().next().value;
+                    if (oldestKey === undefined) break;
+                    searchMemoryCacheRef.current.delete(oldestKey);
+                }
+
+                setTimeout(() => {
+                    onCacheUpdate(searchQuery, sorted, sources);
+                }, 100);
+
+                return sorted;
+            });
+        };
+
+        const runJsonFallback = async () => {
+            const fallbackResponse = await fetch('/api/search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: searchQuery, sources: targetSources, page: 1 }),
+                signal: abortControllerRef.current?.signal,
+            });
+            if (!fallbackResponse.ok) throw new Error('Search failed');
+
+            const payload = await fallbackResponse.json() as {
+                videos?: Video[];
+                totalSources?: number;
+            };
+            const videos = prepareSearchVideos(payload.videos || [], searchQuery.trim());
+            const grouped = new Map<string, Video[]>();
+            for (const video of videos) {
+                const group = grouped.get(video.source) || [];
+                group.push(video);
+                grouped.set(video.source, group);
+            }
+            for (const [sourceId, sourceVideos] of grouped) {
+                applyVideos(sourceVideos, sourceId);
+            }
+            setTotalSources(payload.totalSources || targetSources.length);
+            setCompletedSources(payload.totalSources || targetSources.length);
+            setTotalVideosFound(videos.length);
+            finalizeSearch();
+        };
+
         try {
             const response = await fetch('/api/search-parallel', {
                 method: 'POST',
@@ -109,28 +187,16 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
             if (!response.ok) throw new Error('Search failed');
 
             const reader = response.body?.getReader();
-            if (!reader) throw new Error('No response stream');
+            if (!reader) {
+                await runJsonFallback();
+                return;
+            }
 
             await processSearchStream({
                 reader,
                 currentQuery: searchQuery.trim(),
                 onStart: (total) => setTotalSources(total),
-                onVideos: (newVideos, sourceId) => {
-                    // Optimized: Insert new videos in sorted position
-                    setResults((prev) => binaryInsertVideos(prev, newVideos));
-
-                    // Update source stats (accumulate across pages)
-                    const existing = sourcesMap.get(sourceId);
-                    if (existing) {
-                        existing.count += newVideos.length;
-                    } else {
-                        sourcesMap.set(sourceId, {
-                            count: newVideos.length,
-                            name: newVideos[0]?.sourceName || sourceId,
-                            baseUrl: sourceConfigs.get(sourceId)?.baseUrl,
-                        });
-                    }
-                },
+                onVideos: applyVideos,
                 onProgress: (completed, found) => {
                     setCompletedSources(completed);
                     setTotalVideosFound(found);
@@ -138,41 +204,7 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
                 onPageInfo: (pageCount) => {
                     setMaxPageCount((prev) => Math.max(prev, pageCount));
                 },
-                onComplete: () => {
-                    setLoading(false);
-
-                    // Update available sources with correct property names
-                    const sources = Array.from(sourcesMap.entries()).map(([id, info]) => ({
-                        id: id,
-                        name: info.name,
-                        count: info.count,
-                        ...(info.baseUrl ? { baseUrl: info.baseUrl } : {}),
-                    }));
-                    setAvailableSources(sources);
-
-                    // Apply final sorting after all results are received
-                    setResults((currentResults) => {
-                        const sorted = sortVideos(currentResults, sortBy);
-
-                        searchMemoryCacheRef.current.set(memoryCacheKey, {
-                            results: sorted,
-                            sources,
-                            timestamp: Date.now(),
-                        });
-                        while (searchMemoryCacheRef.current.size > 16) {
-                            const oldestKey = searchMemoryCacheRef.current.keys().next().value;
-                            if (oldestKey === undefined) break;
-                            searchMemoryCacheRef.current.delete(oldestKey);
-                        }
-
-                        // Cache results
-                        setTimeout(() => {
-                            onCacheUpdate(searchQuery, sorted, sources);
-                        }, 100);
-
-                        return sorted;
-                    });
-                },
+                onComplete: finalizeSearch,
                 onError: (message) => {
                     console.error('Search error:', message);
                     setLoading(false);
