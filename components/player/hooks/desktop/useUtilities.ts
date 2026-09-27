@@ -120,9 +120,14 @@ export function useUtilities({
                     const errorBody = await probeResponse.json().catch(() => null) as { error?: string } | null;
                     throw new Error(errorBody?.error || `下载准备失败：HTTP ${probeResponse.status}`);
                 }
+                const probeBody = await probeResponse.json().catch(() => null) as { segments?: number } | null;
 
                 startNativeDownload(downloadUrl, downloadName);
-                showToastNotification('已交给浏览器下载，可离开当前页面；暂停或取消请在浏览器下载管理中操作');
+                showToastNotification(
+                    (probeBody?.segments || 0) > 40
+                        ? '已交给浏览器下载；分片较多，Cloudflare 免费 Worker 可能达到子请求上限'
+                        : '已交给浏览器下载，可离开当前页面；暂停或取消请在浏览器下载管理中操作'
+                );
                 return;
             }
 

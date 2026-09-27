@@ -1,12 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createReadStream } from 'node:fs';
-import { open, stat, unlink } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { Readable } from 'node:stream';
-import { randomUUID } from 'node:crypto';
 
-export const runtime = 'nodejs';
+export const runtime = 'edge';
 
 interface MediaSegment {
   url: string;
@@ -220,13 +214,13 @@ async function loadSegment(segment: MediaSegment): Promise<ArrayBuffer> {
     : data;
 }
 
-function buildDownloadHeaders(filename: string, contentLength: number): Headers {
+function buildDownloadHeaders(filename: string): Headers {
   const headers = new Headers();
   const safeName = filename.replace(/[\r\n"]/g, '_');
   headers.set('Content-Type', 'video/mp2t');
   headers.set('Content-Disposition', `attachment; filename="${safeName}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
-  headers.set('Content-Length', String(contentLength));
   headers.set('Cache-Control', 'no-store');
+  headers.set('X-Accel-Buffering', 'no');
   headers.set('Access-Control-Allow-Origin', '*');
   return headers;
 }
@@ -256,38 +250,32 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(result);
     }
 
-    const tempPath = join(tmpdir(), `kvideo-download-${randomUUID()}.ts`);
-    const file = await open(tempPath, 'w');
-    try {
-      if (playlist.initUrl) {
-        const initResponse = await fetchResource(playlist.initUrl);
-        const initData = await initResponse.arrayBuffer();
-        const data = playlist.initKey
-          ? await decryptSegment(initData, playlist.initKey, 0)
-          : initData;
-        await file.write(new Uint8Array(data));
-      }
+    const stream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        try {
+          if (playlist.initUrl) {
+            const initResponse = await fetchResource(playlist.initUrl);
+            const initData = await initResponse.arrayBuffer();
+            const data = playlist.initKey
+              ? await decryptSegment(initData, playlist.initKey, 0)
+              : initData;
+            controller.enqueue(new Uint8Array(data));
+          }
 
-      for (const segment of playlist.segments) {
-        const data = await loadSegment(segment);
-        await file.write(new Uint8Array(data));
-      }
-      await file.close();
-    } catch (error) {
-      await file.close().catch(() => undefined);
-      await unlink(tempPath).catch(() => undefined);
-      throw error;
-    }
-
-    const fileInfo = await stat(tempPath);
-    const fileStream = createReadStream(tempPath);
-    fileStream.once('close', () => {
-      void unlink(tempPath).catch(() => undefined);
+          for (const segment of playlist.segments) {
+            const data = await loadSegment(segment);
+            controller.enqueue(new Uint8Array(data));
+          }
+          controller.close();
+        } catch (error) {
+          controller.error(error);
+        }
+      },
     });
 
-    return new Response(Readable.toWeb(fileStream) as unknown as ReadableStream<Uint8Array>, {
+    return new Response(stream, {
       status: 200,
-      headers: buildDownloadHeaders(filename, fileInfo.size),
+      headers: buildDownloadHeaders(filename),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : '下载准备失败';
