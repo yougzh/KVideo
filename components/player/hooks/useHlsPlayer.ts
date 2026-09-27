@@ -5,6 +5,7 @@ import { filterM3u8Ad } from '@/lib/utils/m3u8-utils';
 import { useRuntimeFeatures } from '@/components/RuntimeFeaturesProvider';
 import { useIsIOS } from '@/lib/hooks/mobile/useDeviceDetection';
 import { shouldPreferProxiedNativePlayback } from '@/lib/player/airplay-source-utils';
+import { SegmentPrefetch } from './segmentPrefetch';
 
 interface UseHlsPlayerProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -153,11 +154,87 @@ export function useHlsPlayer({
                     config.loader = AdFilterLoader;
                 }
 
+                const prefetch = new SegmentPrefetch({ maxConcurrent: 2, maxSegments: 8 });
+
+                class SegmentPrefetchLoader extends DefaultLoader {
+                    load(context: any, config: any, callbacks: any) {
+                        if (context.type === 'fragment') {
+                            const url: string = context.url;
+                            const cached = prefetch.getCached(url);
+                            if (cached) {
+                                const now = performance.now();
+                                const stats = {
+                                    aborted: false,
+                                    loaded: cached.byteLength,
+                                    retry: 0,
+                                    total: cached.byteLength,
+                                    chunkCount: 1,
+                                    bwEstimate: 0,
+                                    loading: { start: now, first: now, end: now },
+                                    parsing: { start: now, end: now },
+                                    buffering: { start: now, end: now },
+                                };
+                                setTimeout(() => {
+                                    callbacks.onSuccess?.({ url, data: cached, code: 200 }, stats, context, null);
+                                }, 0);
+                                return;
+                            }
+
+                            const entry = prefetch.getEntry(url);
+                            if (entry) {
+                                entry.promise
+                                    .then((data) => {
+                                        if (!data) {
+                                            super.load(context, config, callbacks);
+                                            return;
+                                        }
+                                        const now = performance.now();
+                                        const stats = {
+                                            aborted: false,
+                                            loaded: data.byteLength,
+                                            retry: 0,
+                                            total: data.byteLength,
+                                            chunkCount: 1,
+                                            bwEstimate: 0,
+                                            loading: { start: now, first: now, end: now },
+                                            parsing: { start: now, end: now },
+                                            buffering: { start: now, end: now },
+                                        };
+                                        callbacks.onSuccess?.({ url, data, code: 200 }, stats, context, null);
+                                    });
+                                return;
+                            }
+                        }
+                        super.load(context, config, callbacks);
+                    }
+                }
+
+                config.fLoader = SegmentPrefetchLoader;
+
                 hls = new Hls(config);
                 hlsRef.current = hls;
 
                 hls.loadSource(playbackSrc);
                 hls.attachMedia(video);
+
+                hls.on(Hls.Events.LEVEL_LOADED, (_event, data) => {
+                    if (data.level !== hls?.currentLevel) return;
+                    const details = data.details;
+                    if (!details || !videoRef.current) return;
+                    const buffered = videoRef.current.buffered;
+                    let bufferEnd = videoRef.current.currentTime;
+                    for (let i = 0; i < buffered.length; i += 1) {
+                        if (buffered.start(i) <= videoRef.current.currentTime + 0.5 && buffered.end(i) > bufferEnd) {
+                            bufferEnd = buffered.end(i);
+                        }
+                    }
+                    const currentIndex = details.fragments.findIndex((frag) =>
+                        bufferEnd + 0.001 >= frag.start && bufferEnd < frag.start + frag.duration);
+                    const upcoming = currentIndex >= 0
+                        ? details.fragments.slice(currentIndex + 1, currentIndex + 5)
+                        : details.fragments.slice(0, 4);
+                    prefetch.schedule(upcoming.map((frag) => frag.url).filter(Boolean));
+                });
 
                 // Auto Play Handler
                 hls.on(Hls.Events.FRAG_LOADED, (event, data) => {
