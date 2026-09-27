@@ -33,6 +33,9 @@ export async function GET(request: NextRequest) {
         return new NextResponse('Missing URL parameter', { status: 400 });
     }
 
+    const requestPath = url.toLowerCase().split(/[?#]/)[0];
+    const isPlaylist = requestPath.endsWith('.m3u8');
+
     try {
         // Extract headers to forward (only essential ones)
         const requestHeaders: Record<string, string> = {};
@@ -43,7 +46,12 @@ export async function GET(request: NextRequest) {
             if (value) requestHeaders[key] = value;
         });
 
-        const response = await fetchWithRetry({ url, request, headers: requestHeaders });
+        const response = await fetchWithRetry({
+            url,
+            request,
+            headers: requestHeaders,
+            category: isPlaylist ? 'playlist' : 'fragment',
+        });
 
         // If upstream returned an error, pass it through with CORS headers
         if (!response.ok) {

@@ -4,6 +4,7 @@ interface FetchWithRetryOptions {
     url: string;
     request: NextRequest;
     headers?: Record<string, string>;
+    category?: 'playlist' | 'fragment';
 }
 
 export async function fetchWithRetry({ url, request, headers = {} }: FetchWithRetryOptions): Promise<Response> {
@@ -22,14 +23,18 @@ export async function fetchWithRetry({ url, request, headers = {} }: FetchWithRe
     // Optional IP forwarding (default: Beijing IP)
     const forwardedIP = request.nextUrl.searchParams.get('ip') || '202.108.22.5';
 
-    const MAX_RETRIES = 5;
-    const TIMEOUT_MS = 30000; // 30 seconds
+    const isPlaylist = url.toLowerCase().split(/[?#]/)[0].endsWith('.m3u8') ||
+        request.nextUrl.searchParams.get('type') === 'playlist';
+    const category = isPlaylist ? 'playlist' : 'fragment';
+    const MAX_RETRIES = category === 'playlist' ? 3 : 4;
+    // Playlists gate startup, so fail them faster. Fragments need enough time for slow media.
+    const TIMEOUT_MS = category === 'playlist' ? 10000 : 20000;
     let lastError: unknown = null;
     let response: Response | null = null;
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
         try {
-            // Exponential backoff: 100ms, 200ms, 400ms, 800ms, 1600ms
+            // Linear-ish backoff keeps startup retries predictable
             const backoffDelay = attempt > 1 ? Math.pow(2, attempt - 2) * 100 : 0;
             if (backoffDelay > 0) {
                 await new Promise(resolve => setTimeout(resolve, backoffDelay));
@@ -65,7 +70,7 @@ export async function fetchWithRetry({ url, request, headers = {} }: FetchWithRe
             }
 
             if (response.status === 503 && attempt < MAX_RETRIES) {
-                console.warn(`⚠ Got 503 on attempt ${attempt}, retrying with backoff ${backoffDelay}ms...`);
+                console.warn(`Got 503 on attempt ${attempt}, retrying with backoff ${backoffDelay}ms`);
                 lastError = `503 on attempt ${attempt}`;
                 continue;
             }
@@ -75,7 +80,7 @@ export async function fetchWithRetry({ url, request, headers = {} }: FetchWithRe
         } catch (fetchError) {
             lastError = fetchError;
             if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-                console.warn(`⚠ Timeout on attempt ${attempt}, retrying...`);
+                console.warn(`Timeout on attempt ${attempt}, retrying`);
             } else if (attempt < MAX_RETRIES) {
                 console.warn(`⚠ Fetch error on attempt ${attempt}, retrying...`, fetchError);
             } else {
@@ -93,7 +98,7 @@ export async function fetchWithRetry({ url, request, headers = {} }: FetchWithRe
     // Return the response even if it's an error status (403, 404, etc.)
     // The caller can check response.ok or response.status
     if (!response.ok) {
-        console.warn(`⚠ Returning non-OK response: ${response.status} ${response.statusText}`);
+        console.warn(`Returning non-OK response: ${response.status} ${response.statusText}`);
     }
 
     return response;

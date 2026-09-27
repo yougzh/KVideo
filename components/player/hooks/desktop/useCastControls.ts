@@ -111,11 +111,11 @@ export function useCastControls({
         const session = castContext.getCurrentSession?.();
         if (!session) return;
 
-        const mediaInfo = new mediaInfoConstructor(src, 'video/mp4');
-        // Handle HLS specifically if possible, though DEFAULT_MEDIA_RECEIVER supports it
-        if (src.includes('.m3u8')) {
-            mediaInfo.contentType = 'application/x-mpegurl';
-        }
+        const isHls = src.toLowerCase().includes('.m3u8');
+        const mediaInfo = new mediaInfoConstructor(
+            src,
+            isHls ? 'application/x-mpegurl' : 'video/mp4'
+        );
 
         const request = new loadRequestConstructor(mediaInfo);
 

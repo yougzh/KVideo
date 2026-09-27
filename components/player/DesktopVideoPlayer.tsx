@@ -373,6 +373,7 @@ export function DesktopVideoPlayer({
             className="w-full h-full object-contain"
             poster={poster}
             x-webkit-airplay="allow"
+            preload="metadata"
             playsInline={true} // Crucial for iOS custom fullscreen to work without native player taking over
             controls={false} // Explicitly disable native controls
             onPlay={handlePlay}

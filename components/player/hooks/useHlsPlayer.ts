@@ -96,43 +96,56 @@ export function useHlsPlayer({
                     // Worker & Performance
                     enableWorker: true,
                     lowLatencyMode: false,
+                    startFragPrefetch: true,
 
                     // Buffer Settings
-                    maxBufferLength: 120,
-                    maxMaxBufferLength: 240,
+                    startLevel: -1,
+                    maxBufferLength: 60,
+                    maxMaxBufferLength: 120,
                     maxBufferSize: 120 * 1000 * 1000,
                     maxBufferHole: 0.5,
 
-                    // Start with more buffer
-                    startFragPrefetch: true,
+                    // Prefetch and start playback before the first fragment finishes
+                    testBandwidth: true,
+                    progressive: false,
 
                     // ABR Settings
-                    abrEwmaDefaultEstimate: 500000,
-                    abrEwmaFastLive: 3,
-                    abrEwmaSlowLive: 9,
-                    abrEwmaFastVoD: 3,
-                    abrEwmaSlowVoD: 9,
+                    abrEwmaDefaultEstimate: 1000000,
+                    abrEwmaFastLive: 2,
+                    abrEwmaSlowLive: 8,
+                    abrEwmaFastVoD: 2,
+                    abrEwmaSlowVoD: 8,
                     abrBandWidthFactor: 0.8,
                     abrBandWidthUpFactor: 0.7,
 
-                    // Loading Settings
-                    fragLoadingMaxRetry: 6,
-                    fragLoadingRetryDelay: 1000,
-                    fragLoadingMaxRetryTimeout: 64000,
-                    manifestLoadingMaxRetry: 4,
-                    manifestLoadingRetryDelay: 1000,
-                    manifestLoadingMaxRetryTimeout: 64000,
-                    levelLoadingMaxRetry: 4,
-                    levelLoadingRetryDelay: 1000,
-                    levelLoadingMaxRetryTimeout: 64000,
-
-                    // Timeouts
-                    fragLoadingTimeOut: 20000,
-                    manifestLoadingTimeOut: 10000,
-                    levelLoadingTimeOut: 10000,
+                    // Keep retries short so one slow source does not freeze startup
+                    manifestLoadPolicy: {
+                        default: {
+                            maxTimeToFirstByteMs: 5000,
+                            maxLoadTimeMs: 10000,
+                            timeoutRetry: { maxNumRetry: 1, retryDelayMs: 500, maxRetryDelayMs: 1000, backoff: 'linear' },
+                            errorRetry: { maxNumRetry: 2, retryDelayMs: 500, maxRetryDelayMs: 2000, backoff: 'linear' },
+                        },
+                    },
+                    playlistLoadPolicy: {
+                        default: {
+                            maxTimeToFirstByteMs: 5000,
+                            maxLoadTimeMs: 10000,
+                            timeoutRetry: { maxNumRetry: 1, retryDelayMs: 500, maxRetryDelayMs: 1000, backoff: 'linear' },
+                            errorRetry: { maxNumRetry: 2, retryDelayMs: 500, maxRetryDelayMs: 2000, backoff: 'linear' },
+                        },
+                    },
+                    fragLoadPolicy: {
+                        default: {
+                            maxTimeToFirstByteMs: 8000,
+                            maxLoadTimeMs: 20000,
+                            timeoutRetry: { maxNumRetry: 2, retryDelayMs: 500, maxRetryDelayMs: 2000, backoff: 'linear' },
+                            errorRetry: { maxNumRetry: 3, retryDelayMs: 500, maxRetryDelayMs: 3000, backoff: 'linear' },
+                        },
+                    },
 
                     // Backbuffer
-                    backBufferLength: 90,
+                    backBufferLength: 60,
                 };
 
                 // Use custom loader if ad filtering is enabled
