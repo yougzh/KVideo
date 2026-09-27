@@ -11,6 +11,7 @@ import { useDesktopPlayerState } from './useDesktopPlayerState';
 import { getCopyUrl } from '../utils/urlUtils';
 import { useCastControls } from './desktop/useCastControls';
 import { DEFAULT_SEEK_STEP_SECONDS } from '@/lib/store/settings-store';
+import { useRuntimeFeatures } from '@/components/RuntimeFeaturesProvider';
 
 type DesktopPlayerState = ReturnType<typeof useDesktopPlayerState>;
 
@@ -45,6 +46,7 @@ export function useDesktopPlayerLogic({
     isForceLandscape = false,
     seekStepSeconds = DEFAULT_SEEK_STEP_SECONDS
 }: UseDesktopPlayerLogicProps) {
+    const { mediaProxyEnabled } = useRuntimeFeatures();
     const {
         videoRef, containerRef, progressBarRef, volumeBarRef,
         controlsTimeoutRef, speedMenuTimeoutRef, skipForwardTimeoutRef,
@@ -144,6 +146,7 @@ export function useDesktopPlayerLogic({
         src,
         videoTitle,
         episodeName,
+        mediaProxyEnabled,
         setToastMessage,
         setShowToast,
         toastTimeoutRef
@@ -200,6 +203,11 @@ export function useDesktopPlayerLogic({
         startSpeedMenuTimeout: controlsVisibility.startSpeedMenuTimeout,
         clearSpeedMenuTimeout: controlsVisibility.clearSpeedMenuTimeout,
         handleDownload: utilities.handleDownload,
+        pauseDownload: utilities.pauseDownload,
+        resumeDownload: utilities.resumeDownload,
+        cancelDownload: utilities.cancelDownload,
+        dismissDownload: utilities.dismissDownload,
+        downloadState: utilities.downloadState,
         isDownloading: utilities.isDownloading,
         formatTime: playbackControls.formatTime
     }), [
