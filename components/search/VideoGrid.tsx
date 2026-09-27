@@ -7,6 +7,7 @@ import { VideoGroupCard, GroupedVideo } from './VideoGroupCard';
 import { settingsStore } from '@/lib/store/settings-store';
 import { Video } from '@/lib/types';
 import { useResolutionProbe } from '@/lib/hooks/useResolutionProbe';
+import { prefetchVideoDetail } from '@/lib/player/detail-cache';
 
 interface VideoGridProps {
   videos: Video[];
@@ -150,6 +151,11 @@ export const VideoGrid = memo(function VideoGrid({
     });
     if (isPremium) params.set('premium', '1');
     router.prefetch(`/player?${params.toString()}`);
+
+    const settings = settingsStore.getSettings();
+    const sourceConfig = [...settings.sources, ...settings.premiumSources]
+      .find(candidate => candidate.id === video.source);
+    void prefetchVideoDetail(video.vod_id, video.source, sourceConfig);
   }, [isPremium, router]);
 
   // Normal mode items

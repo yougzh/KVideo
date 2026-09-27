@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { binaryInsertVideos } from '@/lib/utils/sorted-insert';
+import { getCachedVideoDetail, setCachedVideoDetail } from '@/lib/player/detail-cache';
 import type { Video } from '@/lib/types';
 
 function video(id: number, source: string, score = 0): Video {
@@ -32,4 +33,20 @@ test('binaryInsertVideos keeps fast latency first for equal relevance', () => {
   const merged = binaryInsertVideos(existing, incoming);
 
   assert.deepEqual(merged.map((item) => item.vod_id), [2, 1]);
+});
+
+test('video detail cache reuses a prefetched record', () => {
+  const detail = {
+    vod_id: 99,
+    vod_name: 'Cached Video',
+    vod_pic: '',
+    vod_remarks: '',
+    episodes: [],
+    source: 'cache-source',
+    source_code: '',
+  };
+
+  setCachedVideoDetail(detail);
+
+  assert.equal(getCachedVideoDetail(99, 'cache-source')?.vod_name, 'Cached Video');
 });

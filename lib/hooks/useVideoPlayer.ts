@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { settingsStore } from '@/lib/store/settings-store';
+import { getCachedVideoDetail, setCachedVideoDetail } from '@/lib/player/detail-cache';
 
 interface VideoData {
-  vod_id: string;
+  vod_id: string | number;
   vod_name: string;
   vod_pic?: string;
   vod_content?: string;
@@ -60,7 +61,24 @@ export function useVideoPlayer(
     onSourceUnavailableRef.current = onSourceUnavailable;
   }, [onSourceUnavailable]);
 
+  const applyVideoData = useCallback((data: VideoData) => {
+    setVideoData(data);
+    setLoading(false);
 
+    if (data.episodes && data.episodes.length > 0) {
+      const latestIsReversed = isReversedRef.current;
+      const latestEpisodeParam = episodeParamRef.current;
+      const defaultIndex = latestIsReversed ? data.episodes.length - 1 : 0;
+      const episodeIndex = latestEpisodeParam ? parseInt(latestEpisodeParam, 10) : defaultIndex;
+      const validIndex = (episodeIndex >= 0 && episodeIndex < data.episodes.length) ? episodeIndex : defaultIndex;
+
+      setCurrentEpisode(validIndex);
+      setPlayUrl(data.episodes[validIndex].url);
+    } else {
+      setVideoError('该来源没有可播放的剧集');
+      setPlayUrl('');
+    }
+  }, []);
 
   const fetchVideoDetails = useCallback(async () => {
     if (!videoId || !source) return;
@@ -72,6 +90,12 @@ export function useVideoPlayer(
       // Standard behavior: clear error and show loading.
       setVideoError('');
       setLoading(true);
+
+      const cachedDetail = getCachedVideoDetail(videoId, source);
+      if (cachedDetail) {
+        applyVideoData(cachedDetail);
+        return;
+      }
 
       const settings = settingsStore.getSettings();
       const allSources = [
@@ -110,24 +134,8 @@ export function useVideoPlayer(
       }
 
       if (data.success && data.data) {
-        setVideoData(data.data);
-        setLoading(false);
-
-        if (data.data.episodes && data.data.episodes.length > 0) {
-          const latestIsReversed = isReversedRef.current;
-          const latestEpisodeParam = episodeParamRef.current;
-
-          const defaultIndex = latestIsReversed ? data.data.episodes.length - 1 : 0;
-          const episodeIndex = latestEpisodeParam ? parseInt(latestEpisodeParam, 10) : defaultIndex;
-          const validIndex = (episodeIndex >= 0 && episodeIndex < data.data.episodes.length) ? episodeIndex : defaultIndex;
-
-          const episodeUrl = data.data.episodes[validIndex].url;
-          setCurrentEpisode(validIndex);
-          setPlayUrl(episodeUrl);
-        } else {
-          setVideoError('该来源没有可播放的剧集');
-          setLoading(false);
-        }
+        setCachedVideoDetail(data.data);
+        applyVideoData(data.data);
       } else {
         throw new Error(data.error || '来自 API 的响应无效');
       }
@@ -136,7 +144,7 @@ export function useVideoPlayer(
       setVideoError(error instanceof Error ? error.message : '加载视频详情失败。');
       setLoading(false);
     }
-  }, [videoId, source]);
+  }, [applyVideoData, videoId, source]);
 
   // EFFECT: Retry logic when settings change (e.g., sources loaded from subscriptions)
   useEffect(() => {
