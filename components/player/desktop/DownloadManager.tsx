@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Icons } from '@/components/ui/Icon';
 import type { DownloadState } from '../hooks/desktop/useUtilities';
 
@@ -24,29 +25,60 @@ export function DownloadManager({
     onCancel,
     onDismiss,
 }: DownloadManagerProps) {
+    const [expanded, setExpanded] = useState(false);
+    const isActive = state.status === 'preparing' || state.status === 'downloading' || state.status === 'paused';
+
+    useEffect(() => {
+        if (isActive) return;
+        const timeout = window.setTimeout(() => setExpanded(false), 4000);
+        return () => window.clearTimeout(timeout);
+    }, [isActive, state.status]);
+
     if (state.status === 'idle') return null;
 
-    const isActive = state.status === 'preparing' || state.status === 'downloading' || state.status === 'paused';
     const isPaused = state.status === 'paused';
 
+    if (!expanded) {
+        return (
+            <div className="absolute right-3 top-3 z-[70]">
+                <button
+                    type="button"
+                    onClick={() => setExpanded(true)}
+                    className="flex items-center gap-2 rounded-full border border-white/15 bg-black/75 px-3 py-2 text-xs text-white shadow-lg backdrop-blur-xl transition-colors hover:bg-black/90"
+                    aria-label="打开下载管理"
+                >
+                    <Icons.Download size={14} className="text-[var(--accent-color)]" />
+                    <span>
+                        {isPaused ? '已暂停' : isActive ? '下载中' : state.status === 'completed' ? '已完成' : state.status === 'error' ? '下载失败' : '下载'}
+                    </span>
+                    {isActive && <span className="text-white/70">{state.progress}%</span>}
+                </button>
+            </div>
+        );
+    }
+
     return (
-        <div className="absolute bottom-20 right-4 z-[70] w-72 max-w-[calc(100%-2rem)] rounded-lg border border-[var(--glass-border)] bg-black/85 p-3 text-white shadow-2xl backdrop-blur-xl">
+        <div className="absolute right-3 top-3 z-[70] w-72 max-w-[calc(100%-1.5rem)] rounded-lg border border-[var(--glass-border)] bg-black/85 p-3 text-white shadow-2xl backdrop-blur-xl">
             <div className="flex items-start gap-2">
                 <Icons.Download size={18} className="mt-0.5 shrink-0 text-[var(--accent-color)]" />
                 <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{state.fileName || '视频下载'}</div>
                     <div className="mt-1 text-xs text-white/70">{state.message}</div>
                 </div>
-                {!isActive && (
-                    <button
-                        type="button"
-                        onClick={onDismiss}
-                        className="btn-icon h-7 w-7 shrink-0"
-                        aria-label="关闭下载提示"
-                    >
-                        <Icons.X size={16} />
-                    </button>
-                )}
+                <button
+                    type="button"
+                    onClick={() => {
+                        if (isActive) {
+                            setExpanded(false);
+                        } else {
+                            onDismiss();
+                        }
+                    }}
+                    className="btn-icon h-7 w-7 shrink-0"
+                    aria-label={isActive ? '收起下载面板' : '关闭下载提示'}
+                >
+                    <Icons.X size={16} />
+                </button>
             </div>
 
             {isActive && (

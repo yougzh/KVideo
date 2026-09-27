@@ -240,7 +240,7 @@ export function useUtilities({
         throw new Error('无法解析视频播放列表');
     }, [fetchDownloadResource, src]);
 
-    const downloadHls = useCallback(async (filename: string) => {
+    const downloadHls = useCallback(async (filename: string, writable: WritableFileStreamLike | null) => {
         updateDownloadState({
             status: 'preparing',
             progress: 0,
@@ -250,29 +250,6 @@ export function useUtilities({
         });
 
         const media = await resolvePlaylist();
-
-        let writable: WritableFileStreamLike | null = null;
-        if (typeof window.showSaveFilePicker === 'function') {
-            try {
-                const handle = await window.showSaveFilePicker({
-                    suggestedName: `${filename}.ts`,
-                    types: [{
-                        description: 'MPEG-TS 视频',
-                        accept: { 'video/mp2t': ['.ts'] },
-                    }],
-                });
-                writable = await handle.createWritable();
-                writableRef.current = writable;
-                updateDownloadState({ message: '已选择保存位置，开始下载', mode: 'stream' });
-            } catch (error) {
-                if (error instanceof DOMException && error.name === 'AbortError') {
-                    setDownloadState(INITIAL_DOWNLOAD_STATE);
-                    setIsDownloading(false);
-                    return;
-                }
-                console.warn('Save picker unavailable, falling back to browser download:', error);
-            }
-        }
 
         const parts: BlobPart[] = [];
         const totalSegments = media.segments.length;
@@ -345,6 +322,63 @@ export function useUtilities({
         }
     }, [fetchDownloadResource, resolvePlaylist, showToastNotification, updateDownloadState, waitWhilePaused]);
 
+    const downloadDirectStream = useCallback(async (
+        resource: string,
+        writable: WritableFileStreamLike,
+        filename: string
+    ) => {
+        updateDownloadState({
+            status: 'downloading',
+            progress: 0,
+            message: '正在下载到所选位置',
+            fileName: filename,
+            mode: 'stream',
+        });
+
+        const controller = new AbortController();
+        activeRequestRef.current = controller;
+        let bytesReceived = 0;
+
+        try {
+            const response = await fetchDownloadResource(resource, controller.signal);
+            if (!response.ok) throw new Error(`下载失败：HTTP ${response.status}`);
+            const totalBytes = Number(response.headers.get('content-length') || 0);
+            const reader = response.body?.getReader();
+            if (!reader) throw new Error('下载响应没有可读取的数据');
+
+            while (true) {
+                await waitWhilePaused();
+                if (cancelledRef.current) throw new DOMException('下载已取消', 'AbortError');
+
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (!value) continue;
+
+                await writable.write(value);
+                bytesReceived += value.byteLength;
+                updateDownloadState({
+                    status: 'downloading',
+                    bytesReceived,
+                    progress: totalBytes > 0 ? Math.min(99, Math.round((bytesReceived / totalBytes) * 100)) : 0,
+                    message: totalBytes > 0
+                        ? `已下载 ${Math.round((bytesReceived / totalBytes) * 100)}%`
+                        : '正在下载',
+                });
+            }
+
+            await writable.close();
+            writableRef.current = null;
+            updateDownloadState({
+                status: 'completed',
+                progress: 100,
+                message: '已保存到所选位置',
+            });
+            showToastNotification('视频已保存到所选位置');
+        } finally {
+            activeRequestRef.current = null;
+        }
+    }, [fetchDownloadResource, showToastNotification, updateDownloadState, waitWhilePaused]);
+
     const handleDownload = useCallback(async () => {
         if (isDownloading) return;
         cancelledRef.current = false;
@@ -353,19 +387,51 @@ export function useUtilities({
         const filename = sanitizeFileName(videoTitle, episodeName);
 
         try {
-            if (src.toLowerCase().includes('.m3u8')) {
-                await downloadHls(filename);
+            const isHls = src.toLowerCase().includes('.m3u8');
+            const extension = isHls ? 'ts' : extensionFromResource(src);
+            const fileName = `${filename}.${extension}`;
+            let writable: WritableFileStreamLike | null = null;
+
+            if (typeof window.showSaveFilePicker === 'function') {
+                try {
+                    const handle = await window.showSaveFilePicker({
+                        suggestedName: fileName,
+                        types: [{
+                            description: isHls ? 'MPEG-TS 视频' : '视频文件',
+                            accept: isHls
+                                ? { 'video/mp2t': ['.ts'] }
+                                : { 'video/mp4': ['.mp4', '.m4v'], 'video/webm': ['.webm'], 'video/quicktime': ['.mov'] },
+                        }],
+                    });
+                    writable = await handle.createWritable();
+                    writableRef.current = writable;
+                    updateDownloadState({ message: '已选择保存位置，开始下载', mode: 'stream', fileName });
+                } catch (error) {
+                    if (error instanceof DOMException && error.name === 'AbortError') {
+                        setDownloadState(INITIAL_DOWNLOAD_STATE);
+                        return;
+                    }
+                    console.warn('Save picker unavailable, falling back to browser download:', error);
+                }
+            }
+
+            if (isHls) {
+                await downloadHls(filename, writable);
+            } else if (writable) {
+                const downloadUrl = src.startsWith('/api/proxy') || !mediaProxyEnabled
+                    ? src
+                    : `/api/proxy?url=${encodeURIComponent(src)}`;
+                await downloadDirectStream(downloadUrl, writable, fileName);
             } else {
                 const downloadUrl = src.startsWith('/api/proxy') || !mediaProxyEnabled
                     ? src
                     : `/api/proxy?url=${encodeURIComponent(src)}`;
-                const downloadName = `${filename}.${extensionFromResource(src)}`;
-                startNativeDownload(downloadUrl, downloadName);
+                startNativeDownload(downloadUrl, fileName);
                 updateDownloadState({
                     status: 'native',
                     mode: 'native',
                     progress: 100,
-                    fileName: downloadName,
+                    fileName,
                     message: '已交给浏览器下载管理器，可在浏览器中暂停、继续或取消',
                 });
                 showToastNotification('已开始浏览器下载，可在浏览器下载管理中查看');
@@ -386,12 +452,11 @@ export function useUtilities({
         } finally {
             setIsDownloading(false);
         }
-    }, [downloadHls, episodeName, isDownloading, mediaProxyEnabled, showToastNotification, src, updateDownloadState, videoTitle]);
+    }, [downloadDirectStream, downloadHls, episodeName, isDownloading, mediaProxyEnabled, showToastNotification, src, updateDownloadState, videoTitle]);
 
     const pauseDownload = useCallback(() => {
         if (!isDownloading || pausedRef.current) return;
         pausedRef.current = true;
-        activeRequestRef.current?.abort();
         updateDownloadState({ status: 'paused', message: '下载已暂停' });
     }, [isDownloading, updateDownloadState]);
 
