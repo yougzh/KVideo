@@ -8,6 +8,7 @@ import { useAutoSkip } from './hooks/useAutoSkip';
 import { useStallDetection } from './hooks/useStallDetection';
 import { useVideoResolution } from './hooks/useVideoResolution';
 import { DesktopControlsWrapper } from './desktop/DesktopControlsWrapper';
+import { DownloadManager } from './desktop/DownloadManager';
 import { DesktopOverlayWrapper } from './desktop/DesktopOverlayWrapper';
 import { DanmakuCanvas } from './DanmakuCanvas';
 import { usePlayerSettings } from './hooks/usePlayerSettings';
@@ -466,6 +467,14 @@ export function DesktopVideoPlayer({
               data={data}
               logic={logic}
               refs={refs}
+            />
+
+            <DownloadManager
+              state={logic.downloadState}
+              onPause={logic.pauseDownload}
+              onResume={logic.resumeDownload}
+              onCancel={logic.cancelDownload}
+              onDismiss={logic.dismissDownload}
             />
 
           </div>

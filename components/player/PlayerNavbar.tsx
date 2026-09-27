@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -10,9 +13,26 @@ import { siteConfig } from '@/lib/config/site-config';
 export function PlayerNavbar({ isPremium }: { isPremium?: boolean }) {
     const router = useRouter();
     const siteIconSrc = useSiteIcon();
+    const [collapsed, setCollapsed] = useState(true);
+
+    if (collapsed) {
+        return (
+            <div className="fixed left-1/2 top-2 z-[2100] -translate-x-1/2">
+                <button
+                    type="button"
+                    onClick={() => setCollapsed(false)}
+                    className="flex items-center gap-1.5 rounded-full border border-white/15 bg-black/70 px-3 py-1.5 text-xs text-white shadow-lg backdrop-blur-xl transition-colors hover:bg-black/90"
+                    aria-label="展开顶部导航"
+                >
+                    <Icons.ChevronDown size={15} />
+                    显示导航
+                </button>
+            </div>
+        );
+    }
 
     return (
-        <nav className="sticky top-0 z-50 pt-4 pb-2 px-4" style={{ transform: 'translateZ(0)' }}>
+        <nav className="sticky top-0 z-[2100] pt-4 pb-2 px-4" style={{ transform: 'translateZ(0)' }}>
             <div className="max-w-7xl mx-auto bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded-[var(--radius-2xl)] shadow-[var(--shadow-sm)] px-4 sm:px-6 py-4">
                 <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 sm:gap-4 min-w-0">
@@ -40,6 +60,15 @@ export function PlayerNavbar({ isPremium }: { isPremium?: boolean }) {
                         </Button>
                     </div>
                     <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={() => setCollapsed(true)}
+                            className="w-10 h-10 flex items-center justify-center rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all duration-200 cursor-pointer"
+                            aria-label="收起顶部导航"
+                            title="收起顶部导航"
+                        >
+                            <Icons.ChevronDown size={20} className="rotate-180" />
+                        </button>
                         <Link
                             href={isPremium ? '/premium/settings' : '/settings'}
                             className="w-10 h-10 flex items-center justify-center rounded-[var(--radius-full)] bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-color)] hover:bg-[color-mix(in_srgb,var(--accent-color)_10%,transparent)] transition-all duration-200 cursor-pointer"
