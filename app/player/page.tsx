@@ -62,6 +62,8 @@ function PlayerContent() {
   });
   const [isSourceSectionCollapsed, setIsSourceSectionCollapsed] = useState(false);
   const [isEpisodeSectionCollapsed, setIsEpisodeSectionCollapsed] = useState(false);
+  const stickyPlayerRef = useRef<HTMLDivElement>(null);
+  const stickyPlayerFrameRef = useRef<HTMLDivElement>(null);
 
   // Sync with store changes if any (though usually it's one-way from UI to store)
   useEffect(() => {
@@ -141,6 +143,64 @@ function PlayerContent() {
     setVideoError,
     fetchVideoDetails,
   } = useVideoPlayer(videoId, source, episodeParam, isReversed, handleSourceUnavailable);
+
+  useEffect(() => {
+    const updateStickyBounds = () => {
+      const placeholder = stickyPlayerRef.current;
+      const frame = stickyPlayerFrameRef.current;
+      if (!placeholder || !frame) return;
+
+      const viewport = window.visualViewport;
+      const viewportHeight = viewport?.height ?? window.innerHeight;
+      const viewportWidth = viewport?.width ?? window.innerWidth;
+      const viewportOffsetTop = viewport?.offsetTop ?? 0;
+      const viewportOffsetLeft = viewport?.offsetLeft ?? 0;
+      const isDesktop = window.innerWidth >= 1024;
+      const reservedHeight = isDesktop ? 128 : 80;
+      const stickyTop = viewportOffsetTop + (isDesktop ? 96 : 8);
+      const placeholderRect = placeholder.getBoundingClientRect();
+      const maxPlayerWidth = Math.max(
+        240,
+        Math.min(placeholder.clientWidth, ((viewportHeight - reservedHeight) * 16) / 9)
+      );
+
+      frame.style.width = `${Math.floor(maxPlayerWidth)}px`;
+      frame.style.maxWidth = `${Math.max(0, viewportWidth - 32)}px`;
+      placeholder.style.height = `${frame.offsetHeight}px`;
+
+      if (placeholderRect.top <= stickyTop) {
+        const left = Math.max(
+          viewportOffsetLeft + 16,
+          placeholderRect.left + (placeholder.clientWidth - maxPlayerWidth) / 2
+        );
+        frame.style.position = 'fixed';
+        frame.style.top = `${Math.round(stickyTop)}px`;
+        frame.style.left = `${Math.round(left)}px`;
+        frame.style.margin = '0';
+        frame.style.zIndex = '40';
+      } else {
+        frame.style.position = 'relative';
+        frame.style.top = 'auto';
+        frame.style.left = 'auto';
+        frame.style.margin = '0 auto';
+        frame.style.zIndex = '40';
+      }
+    };
+
+    updateStickyBounds();
+    const viewport = window.visualViewport;
+    window.addEventListener('resize', updateStickyBounds);
+    window.addEventListener('scroll', updateStickyBounds, { passive: true });
+    viewport?.addEventListener('resize', updateStickyBounds);
+    viewport?.addEventListener('scroll', updateStickyBounds);
+
+    return () => {
+      window.removeEventListener('resize', updateStickyBounds);
+      window.removeEventListener('scroll', updateStickyBounds);
+      viewport?.removeEventListener('resize', updateStickyBounds);
+      viewport?.removeEventListener('scroll', updateStickyBounds);
+    };
+  }, [loading]);
 
   const groupedSources = useMemo<SourceInfo[]>(() => {
     let sources: SourceInfo[] = [];
@@ -446,21 +506,23 @@ function PlayerContent() {
           <div className={`grid gap-6 lg:grid-cols-3 lg:items-start ${playerGridClass}`}>
             {/* Video Player Section */}
             <div className="lg:col-span-2 xl:col-span-1 space-y-6">
-              <div className="kvideo-sticky-wrapper sticky top-0 z-40 bg-[var(--bg-color)] py-2 lg:top-24">
-                <VideoPlayer
-                  playUrl={playUrl}
-                  videoId={videoId || undefined}
-                  currentEpisode={currentEpisode}
-                  onBack={() => router.back()}
-                  totalEpisodes={videoData?.episodes?.length || 0}
-                  onNextEpisode={handleNextEpisode}
-                  isReversed={isReversed}
-                  isPremium={isPremium}
-                  videoTitle={videoData?.vod_name || title || ''}
-                  episodeName={videoData?.episodes?.[currentEpisode]?.name || ''}
-                  externalTimeRef={playerTimeRef}
-                  onResolutionDetected={handleResolutionDetected}
-                />
+              <div ref={stickyPlayerRef} className="kvideo-sticky-wrapper relative z-40 bg-[var(--bg-color)] py-2">
+                <div ref={stickyPlayerFrameRef} className="mx-auto w-full">
+                  <VideoPlayer
+                    playUrl={playUrl}
+                    videoId={videoId || undefined}
+                    currentEpisode={currentEpisode}
+                    onBack={() => router.back()}
+                    totalEpisodes={videoData?.episodes?.length || 0}
+                    onNextEpisode={handleNextEpisode}
+                    isReversed={isReversed}
+                    isPremium={isPremium}
+                    videoTitle={videoData?.vod_name || title || ''}
+                    episodeName={videoData?.episodes?.[currentEpisode]?.name || ''}
+                    externalTimeRef={playerTimeRef}
+                    onResolutionDetected={handleResolutionDetected}
+                  />
+                </div>
               </div>
               <div className="hidden lg:block">
                 <VideoMetadata

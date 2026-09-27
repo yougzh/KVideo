@@ -6,12 +6,15 @@
 /* Keep the sticky player inside every viewport, including short landscape windows. */
 .kvideo-sticky-wrapper {
     --kvideo-sticky-reserved: 5rem;
+    --kvideo-sticky-top: 0.5rem;
+    --kvideo-sticky-player-width: 100%;
     max-width: 100%;
     overflow: visible;
+    top: var(--kvideo-sticky-top);
 }
 
 .kvideo-sticky-wrapper .kvideo-container:not(.is-web-fullscreen) {
-    width: min(100%, calc((100vh - var(--kvideo-sticky-reserved)) * 16 / 9));
+    width: min(100%, var(--kvideo-sticky-player-width));
     height: auto;
     margin-left: auto;
     margin-right: auto;
@@ -19,13 +22,14 @@
 
 @supports (height: 100dvh) {
     .kvideo-sticky-wrapper .kvideo-container:not(.is-web-fullscreen) {
-        width: min(100%, calc((100dvh - var(--kvideo-sticky-reserved)) * 16 / 9));
+        width: min(100%, var(--kvideo-sticky-player-width));
     }
 }
 
 @media (min-width: 1024px) {
     .kvideo-sticky-wrapper {
         --kvideo-sticky-reserved: 8rem;
+        --kvideo-sticky-top: 6rem;
     }
 }
 
