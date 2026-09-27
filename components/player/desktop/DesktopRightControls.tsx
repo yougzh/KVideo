@@ -14,6 +14,8 @@ interface DesktopRightControlsProps {
     onTogglePictureInPicture: () => void;
     onShowAirPlayMenu: () => void;
     onShowCastMenu: () => void;
+    onDownload: () => void;
+    isDownloading: boolean;
 }
 
 export function DesktopRightControls({
@@ -26,7 +28,9 @@ export function DesktopRightControls({
     onToggleWebFullscreen,
     onTogglePictureInPicture,
     onShowAirPlayMenu,
-    onShowCastMenu
+    onShowCastMenu,
+    onDownload,
+    isDownloading
 }: DesktopRightControlsProps) {
     return (
         <div className="player-controls-right relative z-50 flex shrink-0 items-center gap-3">
@@ -43,6 +47,19 @@ export function DesktopRightControls({
                     </button>
                 )
             }
+
+            {/* Download */}
+            <button
+                onClick={onDownload}
+                disabled={isDownloading}
+                className="btn-icon shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label={isDownloading ? '正在下载' : '下载视频'}
+                title={isDownloading ? '正在下载' : '下载视频'}
+            >
+                {isDownloading
+                    ? <Icons.RefreshCw size={20} className="animate-spin" />
+                    : <Icons.Download size={20} />}
+            </button>
 
             {/* AirPlay */}
             {

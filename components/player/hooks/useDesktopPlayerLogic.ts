@@ -16,6 +16,8 @@ type DesktopPlayerState = ReturnType<typeof useDesktopPlayerState>;
 
 interface UseDesktopPlayerLogicProps {
     src: string;
+    videoTitle?: string;
+    episodeName?: string;
     initialTime: number;
     shouldAutoPlay: boolean;
     onError?: (error: string) => void;
@@ -30,6 +32,8 @@ interface UseDesktopPlayerLogicProps {
 
 export function useDesktopPlayerLogic({
     src,
+    videoTitle,
+    episodeName,
     initialTime,
     shouldAutoPlay,
     onError,
@@ -137,7 +141,12 @@ export function useDesktopPlayerLogic({
     });
 
     const utilities = useUtilities({
-        src, setToastMessage, setShowToast, toastTimeoutRef
+        src,
+        videoTitle,
+        episodeName,
+        setToastMessage,
+        setShowToast,
+        toastTimeoutRef
     });
 
     const castControls = useCastControls({
@@ -190,6 +199,8 @@ export function useDesktopPlayerLogic({
         },
         startSpeedMenuTimeout: controlsVisibility.startSpeedMenuTimeout,
         clearSpeedMenuTimeout: controlsVisibility.clearSpeedMenuTimeout,
+        handleDownload: utilities.handleDownload,
+        isDownloading: utilities.isDownloading,
         formatTime: playbackControls.formatTime
     }), [
         src,

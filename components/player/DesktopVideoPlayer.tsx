@@ -243,6 +243,8 @@ export function DesktopVideoPlayer({
 
   const logic = useDesktopPlayerLogic({
     src,
+    videoTitle,
+    episodeName,
     initialTime,
     shouldAutoPlay,
     onError,

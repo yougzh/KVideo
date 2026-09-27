@@ -38,6 +38,8 @@ export function DesktopControlsWrapper({ src, data, logic, refs }: DesktopContro
         togglePictureInPicture,
         showAirPlayMenu,
         showCastMenu,
+        handleDownload,
+        isDownloading,
         handleProgressClick,
         handleProgressMouseDown,
         handleProgressTouchStart,
@@ -80,6 +82,8 @@ export function DesktopControlsWrapper({ src, data, logic, refs }: DesktopContro
             onTogglePictureInPicture={togglePictureInPicture}
             onShowAirPlayMenu={showAirPlayMenu}
             onShowCastMenu={showCastMenu}
+            onDownload={handleDownload}
+            isDownloading={isDownloading}
             onProgressClick={handleProgressClick}
             onProgressMouseDown={handleProgressMouseDown}
             onProgressTouchStart={handleProgressTouchStart}
