@@ -2,15 +2,28 @@
 
 import { Suspense, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { SearchForm } from '@/components/search/SearchForm';
 import { NoResults } from '@/components/search/NoResults';
-import { PopularFeatures } from '@/components/home/PopularFeatures';
-import { FavoritesSidebar } from '@/components/favorites/FavoritesSidebar';
 import { Navbar } from '@/components/layout/Navbar';
-import { SearchResults } from '@/components/home/SearchResults';
 import { SourceSetupEmptyState } from '@/components/home/SourceSetupEmptyState';
 import { useHomePage } from '@/lib/hooks/useHomePage';
 import { useLatencyPing } from '@/lib/hooks/useLatencyPing';
+
+const PopularFeatures = dynamic(
+  () => import('@/components/home/PopularFeatures').then(module => module.PopularFeatures),
+  { ssr: false }
+);
+
+const SearchResults = dynamic(
+  () => import('@/components/home/SearchResults').then(module => module.SearchResults),
+  { ssr: false }
+);
+
+const FavoritesSidebar = dynamic(
+  () => import('@/components/favorites/FavoritesSidebar').then(module => module.FavoritesSidebar),
+  { ssr: false }
+);
 
 function HomePage() {
   const {
