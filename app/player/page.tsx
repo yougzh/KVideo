@@ -145,7 +145,19 @@ function PlayerContent() {
   } = useVideoPlayer(videoId, source, episodeParam, isReversed, handleSourceUnavailable);
 
   useEffect(() => {
-    const updateStickyBounds = () => {
+    let floatThreshold = Number.POSITIVE_INFINITY;
+    let isFloating = false;
+    let rafId = 0;
+    let lastMetricsKey = '';
+
+    const applyFloatingState = (nextFloating: boolean) => {
+      const frame = stickyPlayerFrameRef.current;
+      if (!frame || isFloating === nextFloating) return;
+      isFloating = nextFloating;
+      frame.classList.toggle('is-floating', nextFloating);
+    };
+
+    const recalculateStickyBounds = () => {
       const placeholder = stickyPlayerRef.current;
       const frame = stickyPlayerFrameRef.current;
       if (!placeholder || !frame) return;
@@ -163,42 +175,53 @@ function PlayerContent() {
         240,
         Math.min(placeholder.clientWidth, ((viewportHeight - reservedHeight) * 16) / 9)
       );
+      const roundedWidth = Math.floor(maxPlayerWidth);
+      const maxWidth = Math.max(0, viewportWidth - 32);
+      const left = Math.round(Math.max(
+        viewportOffsetLeft + 16,
+        placeholderRect.left + (placeholder.clientWidth - maxPlayerWidth) / 2
+      ));
+      const top = Math.round(stickyTop);
+      const placeholderHeight = Math.round(maxPlayerWidth * 9 / 16) + 16;
+      const nextThreshold = placeholderRect.top + window.scrollY - stickyTop;
+      const metricsKey = `${roundedWidth}|${maxWidth}|${left}|${top}|${placeholderHeight}|${nextThreshold}`;
+      if (metricsKey === lastMetricsKey) return;
+      lastMetricsKey = metricsKey;
 
-      frame.style.width = `${Math.floor(maxPlayerWidth)}px`;
-      frame.style.maxWidth = `${Math.max(0, viewportWidth - 32)}px`;
-      placeholder.style.height = `${frame.offsetHeight}px`;
+      frame.style.width = `${roundedWidth}px`;
+      frame.style.maxWidth = `${maxWidth}px`;
+      frame.style.setProperty('--kvideo-floating-top', `${top}px`);
+      frame.style.setProperty('--kvideo-floating-left', `${left}px`);
+      placeholder.style.height = `${placeholderHeight}px`;
 
-      if (placeholderRect.top <= stickyTop) {
-        const left = Math.max(
-          viewportOffsetLeft + 16,
-          placeholderRect.left + (placeholder.clientWidth - maxPlayerWidth) / 2
-        );
-        frame.style.position = 'fixed';
-        frame.style.top = `${Math.round(stickyTop)}px`;
-        frame.style.left = `${Math.round(left)}px`;
-        frame.style.margin = '0';
-        frame.style.zIndex = '40';
-      } else {
-        frame.style.position = 'relative';
-        frame.style.top = 'auto';
-        frame.style.left = 'auto';
-        frame.style.margin = '0 auto';
-        frame.style.zIndex = '40';
-      }
+      floatThreshold = nextThreshold;
+      applyFloatingState(window.scrollY >= floatThreshold);
     };
 
-    updateStickyBounds();
+    const handleScroll = () => {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(() => {
+        rafId = 0;
+        applyFloatingState(window.scrollY >= floatThreshold);
+      });
+    };
+
+    recalculateStickyBounds();
     const viewport = window.visualViewport;
-    window.addEventListener('resize', updateStickyBounds);
-    window.addEventListener('scroll', updateStickyBounds, { passive: true });
-    viewport?.addEventListener('resize', updateStickyBounds);
-    viewport?.addEventListener('scroll', updateStickyBounds);
+    const resizeObserver = new ResizeObserver(recalculateStickyBounds);
+    if (stickyPlayerRef.current) resizeObserver.observe(stickyPlayerRef.current);
+    window.addEventListener('resize', recalculateStickyBounds);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    viewport?.addEventListener('resize', recalculateStickyBounds);
+    viewport?.addEventListener('scroll', handleScroll, { passive: true });
 
     return () => {
-      window.removeEventListener('resize', updateStickyBounds);
-      window.removeEventListener('scroll', updateStickyBounds);
-      viewport?.removeEventListener('resize', updateStickyBounds);
-      viewport?.removeEventListener('scroll', updateStickyBounds);
+      if (rafId) window.cancelAnimationFrame(rafId);
+      resizeObserver.disconnect();
+      window.removeEventListener('resize', recalculateStickyBounds);
+      window.removeEventListener('scroll', handleScroll);
+      viewport?.removeEventListener('resize', recalculateStickyBounds);
+      viewport?.removeEventListener('scroll', handleScroll);
     };
   }, [loading]);
 
@@ -507,7 +530,7 @@ function PlayerContent() {
             {/* Video Player Section */}
             <div className="lg:col-span-2 xl:col-span-1 space-y-6">
               <div ref={stickyPlayerRef} className="kvideo-sticky-wrapper relative z-40 bg-[var(--bg-color)] py-2">
-                <div ref={stickyPlayerFrameRef} className="mx-auto w-full">
+                <div ref={stickyPlayerFrameRef} className="kvideo-sticky-frame w-full">
                   <VideoPlayer
                     playUrl={playUrl}
                     videoId={videoId || undefined}

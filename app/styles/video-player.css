@@ -20,6 +20,21 @@
     margin-right: auto;
 }
 
+.kvideo-sticky-frame {
+    position: relative;
+    z-index: 40;
+    margin: 0 auto;
+    will-change: transform;
+    contain: layout paint;
+}
+
+.kvideo-sticky-frame.is-floating {
+    position: fixed;
+    top: var(--kvideo-floating-top, 0.5rem);
+    left: var(--kvideo-floating-left, 1rem);
+    margin: 0;
+}
+
 @supports (height: 100dvh) {
     .kvideo-sticky-wrapper .kvideo-container:not(.is-web-fullscreen) {
         width: min(100%, var(--kvideo-sticky-player-width));
