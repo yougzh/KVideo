@@ -9,11 +9,14 @@ import type { Video } from '@/lib/types';
  * Sorts by: 1) relevance score (DESC), 2) latency (ASC)
  */
 export function binaryInsertVideos<T extends Video>(existing: T[], newVideos: T[]): T[] {
-    if (existing.length === 0) return newVideos;
-
     const combined = [...existing];
+    const seenKeys = new Set(combined.map(video => `${video.source}:${video.vod_id}`));
 
     for (const video of newVideos) {
+        const videoKey = `${video.source}:${video.vod_id}`;
+        if (seenKeys.has(videoKey)) continue;
+        seenKeys.add(videoKey);
+
         const relevanceScore = video.relevanceScore || 0;
         const latency = video.latency || 99999;
 

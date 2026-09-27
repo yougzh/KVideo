@@ -29,14 +29,14 @@ async function searchVideosBySource(
                     ...source.headers,
                 },
                 signal,
-            });
+            }, 8000);
 
             if (!res.ok) {
                 throw new Error(`HTTP ${res.status}: ${res.statusText}`);
             }
 
             return res;
-        });
+        }, 1);
 
         const data: ApiSearchResponse = await response.json();
 

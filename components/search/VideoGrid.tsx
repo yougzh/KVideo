@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useMemo, memo, useEffect } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { VideoCard } from './VideoCard';
 import { VideoGroupCard, GroupedVideo } from './VideoGroupCard';
 import { settingsStore } from '@/lib/store/settings-store';
@@ -26,6 +26,8 @@ export const VideoGrid = memo(function VideoGrid({
   const [displayMode, setDisplayMode] = useState<'normal' | 'grouped'>('normal');
   const gridRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
+  const prefetchedVideosRef = useRef<Set<string>>(new Set());
+  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -136,6 +138,20 @@ export const VideoGrid = memo(function VideoGrid({
     }
   }, [activeCardId]);
 
+  const prefetchVideo = useCallback((video: Video) => {
+    const key = `${video.source}:${video.vod_id}`;
+    if (prefetchedVideosRef.current.has(key)) return;
+    prefetchedVideosRef.current.add(key);
+
+    const params = new URLSearchParams({
+      id: String(video.vod_id),
+      source: video.source,
+      title: video.vod_name,
+    });
+    if (isPremium) params.set('premium', '1');
+    router.prefetch(`/player?${params.toString()}`);
+  }, [isPremium, router]);
+
   // Normal mode items
   const videoItems = useMemo(() => {
     if (displayMode === 'grouped') return [];
@@ -191,7 +207,7 @@ export const VideoGrid = memo(function VideoGrid({
       >
         {displayMode === 'grouped' ? (
           // Grouped mode
-          groupItems.slice(0, visibleCount).map(({ group, cardId }) => {
+          groupItems.slice(0, visibleCount).map(({ group, cardId }, index) => {
             const isActive = activeCardId === cardId;
             return (
               <VideoGroupCard
@@ -200,6 +216,8 @@ export const VideoGrid = memo(function VideoGrid({
                 cardId={cardId}
                 isActive={isActive}
                 onCardClick={handleCardClick}
+                onPrefetch={() => prefetchVideo(group.representative)}
+                priority={index < 6}
                 isPremium={isPremium}
                 latencies={latencies}
                 resolution={resolutions[`${group.representative.source}:${group.representative.vod_id}`]}
@@ -209,7 +227,7 @@ export const VideoGrid = memo(function VideoGrid({
           })
         ) : (
           // Normal mode
-          videoItems.slice(0, visibleCount).map(({ video, videoUrl, cardId }) => {
+          videoItems.slice(0, visibleCount).map(({ video, videoUrl, cardId }, index) => {
             const isActive = activeCardId === cardId;
             return (
               <VideoCard
@@ -219,6 +237,8 @@ export const VideoGrid = memo(function VideoGrid({
                 cardId={cardId}
                 isActive={isActive}
                 onCardClick={handleCardClick}
+                onPrefetch={() => prefetchVideo(video)}
+                priority={index < 6}
                 isPremium={isPremium}
                 latencies={latencies}
                 resolution={resolutions[`${video.source}:${video.vod_id}`]}

@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useMemo } from 'react';
 
+const CAST_SDK_SCRIPT_ID = 'kvideo-cast-sender-sdk';
+const CAST_SDK_SRC = 'https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1';
+
 interface UseCastControlsProps {
     src: string;
     videoRef: React.RefObject<HTMLVideoElement | null>;
@@ -213,6 +216,14 @@ export function useCastControls({
                 }
             };
             window.__onGCastApiAvailable = onGCastApiAvailable;
+
+            if (!document.getElementById(CAST_SDK_SCRIPT_ID)) {
+                const script = document.createElement('script');
+                script.id = CAST_SDK_SCRIPT_ID;
+                script.src = CAST_SDK_SRC;
+                script.async = true;
+                document.head.appendChild(script);
+            }
         }
 
         return () => {

@@ -9,12 +9,51 @@ import { NextRequest } from 'next/server';
 import { searchVideos } from '@/lib/api/client';
 import { getSourceName } from '@/lib/utils/source-names';
 import { traditionalToSimplified } from '@/lib/utils/chinese-convert';
+import type { VideoSource } from '@/lib/types';
 
 export const runtime = 'edge';
 
 const MAX_TOTAL_VIDEOS = 2000;
 const MAX_PAGES_PER_SOURCE = 3;
-const PER_SOURCE_TIMEOUT_MS = 20000;
+const PER_SOURCE_TIMEOUT_MS = 12000;
+const SOURCE_SEARCH_CACHE_TTL_MS = 2 * 60 * 1000;
+const SOURCE_SEARCH_CACHE_MAX_ENTRIES = 400;
+
+type SourceSearchResult = Awaited<ReturnType<typeof searchVideos>>;
+
+interface CachedSourceSearch {
+  expiresAt: number;
+  result: SourceSearchResult;
+}
+
+const sourceSearchCache = new Map<string, CachedSourceSearch>();
+
+async function searchVideosCached(
+  query: string,
+  source: VideoSource,
+  page: number,
+  signal: AbortSignal
+): Promise<SourceSearchResult> {
+  const cacheKey = `${source.id}|${source.baseUrl}|${source.searchPath}|${page}|${query}`;
+  const cached = sourceSearchCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.result;
+  }
+
+  const result = await searchVideos(query, [source], page, signal);
+  if (!signal.aborted) {
+    sourceSearchCache.set(cacheKey, {
+      expiresAt: Date.now() + SOURCE_SEARCH_CACHE_TTL_MS,
+      result,
+    });
+    while (sourceSearchCache.size > SOURCE_SEARCH_CACHE_MAX_ENTRIES) {
+      const oldestKey = sourceSearchCache.keys().next().value;
+      if (oldestKey === undefined) break;
+      sourceSearchCache.delete(oldestKey);
+    }
+  }
+  return result;
+}
 
 export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
@@ -76,8 +115,8 @@ export async function POST(request: NextRequest) {
           signal.addEventListener('abort', onRequestAbort, { once: true });
 
           try {
-            const result = await searchVideos(
-              normalizedQuery, [source], 1, sourceController.signal
+            const result = await searchVideosCached(
+              normalizedQuery, source, 1, sourceController.signal
             );
             const endTime = performance.now();
             const latency = Math.round(endTime - startTime);
@@ -116,12 +155,12 @@ export async function POST(request: NextRequest) {
                 { length: maxPages - 1 }, (_, i) => i + 2
               );
 
-              for (const pg of remainingPages) {
-                if (signal.aborted || totalVideosFound >= MAX_TOTAL_VIDEOS) break;
+              await Promise.all(remainingPages.map(async (pg) => {
+                if (signal.aborted || totalVideosFound >= MAX_TOTAL_VIDEOS) return;
 
                 try {
-                  const pageResult = await searchVideos(
-                    normalizedQuery, [source], pg, sourceController.signal
+                  const pageResult = await searchVideosCached(
+                    normalizedQuery, source, pg, sourceController.signal
                   );
                   const pageVideos = pageResult[0]?.results || [];
                   totalVideosFound += pageVideos.length;
@@ -150,7 +189,7 @@ export async function POST(request: NextRequest) {
                 } catch {
                   // Page fetch failed, continue
                 }
-              }
+              }));
             }
           } catch (error) {
             const endTime = performance.now();

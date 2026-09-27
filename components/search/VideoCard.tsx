@@ -20,6 +20,8 @@ interface VideoCardProps {
     cardId: string;
     isActive: boolean;
     onCardClick: (e: React.MouseEvent, cardId: string, videoUrl: string) => void;
+    onPrefetch?: () => void;
+    priority?: boolean;
     isPremium?: boolean;
     latencies?: Record<string, number>;
     resolution?: ResolutionInfo | null;
@@ -32,6 +34,8 @@ export const VideoCard = memo<VideoCardProps>(({
     cardId,
     isActive,
     onCardClick,
+    onPrefetch,
+    priority = false,
     isPremium = false,
     latencies = {},
     resolution,
@@ -45,7 +49,10 @@ export const VideoCard = memo<VideoCardProps>(({
                 position: 'relative',
                 zIndex: 1,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.zIndex = '100')}
+            onMouseEnter={(e) => {
+                e.currentTarget.style.zIndex = '100';
+                onPrefetch?.();
+            }}
             onMouseLeave={(e) => (e.currentTarget.style.zIndex = '1')}
         >
             <Link
@@ -55,6 +62,7 @@ export const VideoCard = memo<VideoCardProps>(({
                 role="listitem"
                 aria-label={`${video.vod_name}${video.vod_remarks ? ` - ${video.vod_remarks}` : ''}`}
                 prefetch={false}
+                onFocus={onPrefetch}
                 data-focusable
                 className="group cursor-pointer hover:translate-y-[-2px] transition-transform duration-200 ease-out block h-full"
             >
@@ -75,7 +83,9 @@ export const VideoCard = memo<VideoCardProps>(({
                                 fill
                                 className="object-cover rounded-[var(--radius-2xl)]"
                                 sizes="(max-width: 640px) 33vw, (max-width: 1024px) 20vw, 16vw"
-                                loading="eager"
+                                loading={priority ? 'eager' : 'lazy'}
+                                fetchPriority={priority ? 'high' : 'auto'}
+                                decoding="async"
                                 unoptimized
                                 referrerPolicy="no-referrer"
                                 onError={(e) => {

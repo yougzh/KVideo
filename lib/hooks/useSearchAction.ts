@@ -3,11 +3,17 @@ import { sortVideos } from '@/lib/utils/sort';
 import { binaryInsertVideos } from '@/lib/utils/sorted-insert';
 import { processSearchStream } from '@/lib/utils/search-stream';
 import type { SortOption } from '@/lib/store/settings-store';
+import type { SourceBadge, Video } from '@/lib/types';
 import { settingsStore } from '@/lib/store/settings-store';
 import { useSearchState } from './useSearchState';
 
 type SearchState = ReturnType<typeof useSearchState>;
 type SearchSourceConfig = { id: string; baseUrl?: string };
+interface MemorySearchCache {
+    results: Video[];
+    sources: SourceBadge[];
+    timestamp: number;
+}
 
 interface UseSearchActionProps {
     state: SearchState;
@@ -34,6 +40,7 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
     const abortControllerRef = useRef<AbortController | null>(null);
     // Keep track of the last search params so loadMore can re-use them
     const lastSearchParamsRef = useRef<{ query: string; sources: any[]; sortBy: SortOption } | null>(null);
+    const searchMemoryCacheRef = useRef<Map<string, MemorySearchCache>>(new Map());
 
     const performSearch = useCallback(async (searchQuery: string, sources: any[] = [], sortBy: SortOption = 'default') => {
         if (!searchQuery.trim()) return;
@@ -54,14 +61,42 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
         }
         abortControllerRef.current = new AbortController();
 
+        const sourceKey = targetSources.map((source: SearchSourceConfig) => source.id).sort().join(',');
+        const memoryCacheKey = `${searchQuery.trim()}::${sourceKey}`;
+        const cachedSearch = searchMemoryCacheRef.current.get(memoryCacheKey);
+
         // Reset state
         startSearch(searchQuery.trim());
+
+        if (cachedSearch) {
+            setResults(cachedSearch.results);
+            setAvailableSources(cachedSearch.sources);
+            setTotalVideosFound(cachedSearch.results.length);
+            setTotalSources(targetSources.length);
+            setLoading(false);
+        }
 
         // Save search params for loadMore
         lastSearchParamsRef.current = { query: searchQuery.trim(), sources: targetSources, sortBy };
 
         // Update URL
         onUrlUpdate(searchQuery);
+
+        const sourceConfigs = new Map<string, SearchSourceConfig>(
+            targetSources.map((source: SearchSourceConfig) => [source.id, source])
+        );
+        const sourcesMap = new Map<string, { count: number; name: string; baseUrl?: string }>();
+        if (cachedSearch) {
+            for (const source of cachedSearch.sources) {
+                if (source?.id) {
+                    sourcesMap.set(source.id, {
+                        count: source.count || 0,
+                        name: source.name || source.id,
+                        baseUrl: source.baseUrl,
+                    });
+                }
+            }
+        }
 
         try {
             const response = await fetch('/api/search-parallel', {
@@ -75,11 +110,6 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
 
             const reader = response.body?.getReader();
             if (!reader) throw new Error('No response stream');
-
-            const sourceConfigs = new Map<string, SearchSourceConfig>(
-                targetSources.map((source: SearchSourceConfig) => [source.id, source])
-            );
-            const sourcesMap = new Map<string, { count: number; name: string; baseUrl?: string }>();
 
             await processSearchStream({
                 reader,
@@ -123,6 +153,17 @@ export function useSearchAction({ state, onCacheUpdate, onUrlUpdate }: UseSearch
                     // Apply final sorting after all results are received
                     setResults((currentResults) => {
                         const sorted = sortVideos(currentResults, sortBy);
+
+                        searchMemoryCacheRef.current.set(memoryCacheKey, {
+                            results: sorted,
+                            sources,
+                            timestamp: Date.now(),
+                        });
+                        while (searchMemoryCacheRef.current.size > 16) {
+                            const oldestKey = searchMemoryCacheRef.current.keys().next().value;
+                            if (oldestKey === undefined) break;
+                            searchMemoryCacheRef.current.delete(oldestKey);
+                        }
 
                         // Cache results
                         setTimeout(() => {

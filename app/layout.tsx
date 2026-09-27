@@ -152,9 +152,6 @@ export default async function RootLayout({
           className="sr-only"
         />
 
-        {/* Google Cast SDK */}
-        <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1" async />
-
         {/* Scroll Performance Optimization Script */}
         <script
           dangerouslySetInnerHTML={{
