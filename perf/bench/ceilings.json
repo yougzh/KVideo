@@ -1,0 +1,17 @@
+{
+  "ready_p75": {
+    "label": "打开到能用 p75 (ms)",
+    "ceiling": 285.30000001192093,
+    "tolerance": 0.05
+  },
+  "requests_p75": {
+    "label": "关键路径请求数 p75",
+    "ceiling": 12,
+    "tolerance": 0
+  },
+  "bytes_p75": {
+    "label": "关键路径传输字节 p75",
+    "ceiling": 61706,
+    "tolerance": 0
+  }
+}

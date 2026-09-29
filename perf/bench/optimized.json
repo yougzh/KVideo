@@ -1,0 +1,114 @@
+{
+  "url": "http://127.0.0.1:3000/",
+  "runs": 10,
+  "profile": "fast4g",
+  "ready_p50": 274,
+  "ready_p75": 285.30000001192093,
+  "ready_p95": 287.69999998807907,
+  "lcp_p75": 0,
+  "longtask_p75": 0,
+  "requests_p75": 12,
+  "bytes_p75": 61706,
+  "samples": [
+    {
+      "ready": 287.69999998807907,
+      "lcp": null,
+      "longtask": 0,
+      "ttfb": 26.899999976158142,
+      "domContentLoaded": 290.80000001192093,
+      "requests": 11,
+      "transferBytes": 56927,
+      "wall": 331
+    },
+    {
+      "ready": 285.30000001192093,
+      "lcp": null,
+      "longtask": 0,
+      "ttfb": 22.099999964237213,
+      "domContentLoaded": 288.69999998807907,
+      "requests": 12,
+      "transferBytes": 61706,
+      "wall": 322
+    },
+    {
+      "ready": 285.0999999642372,
+      "lcp": null,
+      "longtask": 0,
+      "ttfb": 23.5,
+      "domContentLoaded": 289.89999997615814,
+      "requests": 11,
+      "transferBytes": 56927,
+      "wall": 325
+    },
+    {
+      "ready": 269.60000002384186,
+      "lcp": null,
+      "longtask": 0,
+      "ttfb": 21,
+      "domContentLoaded": 273.30000001192093,
+      "requests": 11,
+      "transferBytes": 56927,
+      "wall": 306
+    },
+    {
+      "ready": 270.39999997615814,
+      "lcp": null,
+      "longtask": 0,
+      "ttfb": 21.69999998807907,
+      "domContentLoaded": 273.80000001192093,
+      "requests": 11,
+      "transferBytes": 56927,
+      "wall": 303
+    },
+    {
+      "ready": 274,
+      "lcp": null,
+      "longtask": 0,
+      "ttfb": 25.099999964237213,
+      "domContentLoaded": 277.5,
+      "requests": 11,
+      "transferBytes": 56927,
+      "wall": 311
+    },
+    {
+      "ready": 285.5,
+      "lcp": 296,
+      "longtask": 0,
+      "ttfb": 22.80000001192093,
+      "domContentLoaded": 288.5,
+      "requests": 12,
+      "transferBytes": 61706,
+      "wall": 331
+    },
+    {
+      "ready": 264.5999999642372,
+      "lcp": null,
+      "longtask": 0,
+      "ttfb": 20.099999964237213,
+      "domContentLoaded": 268.39999997615814,
+      "requests": 11,
+      "transferBytes": 56927,
+      "wall": 307
+    },
+    {
+      "ready": 281.19999998807907,
+      "lcp": null,
+      "longtask": 0,
+      "ttfb": 19.899999976158142,
+      "domContentLoaded": 286.5,
+      "requests": 12,
+      "transferBytes": 61706,
+      "wall": 323
+    },
+    {
+      "ready": 264.5999999642372,
+      "lcp": null,
+      "longtask": 0,
+      "ttfb": 25.799999952316284,
+      "domContentLoaded": 267.39999997615814,
+      "requests": 11,
+      "transferBytes": 56927,
+      "wall": 304
+    }
+  ]
+}
