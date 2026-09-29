@@ -114,11 +114,14 @@ export function PasswordGate({
 }) {
   useSubscriptionSync();
 
-  const [isLocked, setIsLocked] = useState(true);
+  // When no auth is configured server-side, render children immediately so
+  // the page shell can be server-rendered. Sites with auth keep the previous
+  // behavior: nothing renders until the client resolves the session.
+  const [isLocked, setIsLocked] = useState(initialHasAuth);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [isClient, setIsClient] = useState(false);
+  const [isClient, setIsClient] = useState(!initialHasAuth);
   const [persistSession, setPersistSession] = useState(true);
   const [isValidating, setIsValidating] = useState(false);
   const [loginMode, setLoginMode] = useState<LoginMode>('none');

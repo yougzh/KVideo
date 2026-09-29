@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useSearchCache } from '@/lib/hooks/useSearchCache';
 import { useParallelSearch } from '@/lib/hooks/useParallelSearch';
 import { useSubscriptionSync } from '@/lib/hooks/useSubscriptionSync';
@@ -7,16 +7,15 @@ import { settingsStore, type SortOption } from '@/lib/store/settings-store';
 import { userSourcesStore } from '@/lib/store/user-sources-store';
 import { isVideoSourceEnabled } from '@/lib/utils/video-source';
 
-export function useHomePage() {
+export function useHomePage(initialQuery = '') {
     const { syncState } = useSubscriptionSync();
     const router = useRouter();
-    const searchParams = useSearchParams();
     const { loadFromCache, saveToCache } = useSearchCache();
     const hasLoadedCache = useRef(false);
     const hasSearchedWithSourcesRef = useRef(false);
     const isInitialCacheLoad = useRef(false);
 
-    const urlQuery = searchParams.get('q')?.trim() || '';
+    const urlQuery = initialQuery.trim();
     const query = urlQuery;
     const hasSearched = urlQuery.length > 0;
     const [currentSortBy, setCurrentSortBy] = useState<SortOption>('default');

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -18,7 +18,7 @@ import { RuntimeFeaturesProvider } from "@/components/RuntimeFeaturesProvider";
 import { VideoTogetherController } from '@/components/VideoTogetherController';
 import { shouldEnableVercelAnalytics } from '@/lib/config/deployment';
 import { getRuntimeFeatures } from "@/lib/server/runtime-features";
-import { resolveSiteIconSrc } from '@/lib/server/site-icon';
+import { DEFAULT_SITE_ICON_PATH, resolveSiteIconSrc } from '@/lib/server/site-icon';
 import fs from 'fs';
 import path from 'path';
 
@@ -66,12 +66,13 @@ async function AdKeywordsWrapper() {
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteIconSrc = await resolveSiteIconSrc();
+  const faviconSrc = siteIconSrc === DEFAULT_SITE_ICON_PATH ? '/icon-32.png' : siteIconSrc;
 
   return {
     title: siteConfig.title,
     description: siteConfig.description,
     icons: {
-      icon: siteIconSrc,
+      icon: faviconSrc,
     },
   };
 }
@@ -134,7 +135,9 @@ export default async function RootLayout({
                   <AdKeywordsWrapper />
                   {children}
                   <BackToTop />
-                  <ScrollPositionManager />
+                  <Suspense fallback={null}>
+                    <ScrollPositionManager />
+                  </Suspense>
                 </PasswordGate>
               </TVProvider>
               {vercelAnalyticsEnabled ? <Analytics /> : null}

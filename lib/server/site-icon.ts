@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-export const DEFAULT_SITE_ICON_PATH = '/icon.png';
+export const DEFAULT_SITE_ICON_PATH = '/icon-180.png';
 const LEGACY_SITE_ICON_ROUTE = '/api/site-icon';
 
 function getMimeType(filePath: string): string {

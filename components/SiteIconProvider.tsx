@@ -2,7 +2,7 @@
 
 import { createContext, useContext } from 'react';
 
-const SiteIconContext = createContext('/icon.png');
+const SiteIconContext = createContext('/icon-180.png');
 
 export function SiteIconProvider({
   children,
